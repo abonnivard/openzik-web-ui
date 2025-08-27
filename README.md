@@ -3,7 +3,7 @@
 ## 🚀 Description
 OpenZik is a modern web music streaming application inspired by Spotify.  
 It allows users to:
-- Search for artists, albums, tracks, playlists, and profiles from Spotify.
+- Search for artists, albums, tracks, playlists, and profiles from Spotify and download it locally with qBittorrent and Prowlarr.
 - Manage their personal library.
 - Create and view playlists.
 - Play local and streaming music.
