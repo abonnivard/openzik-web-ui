@@ -1,70 +1,100 @@
-# Getting Started with Create React App
+# 🎵 OpenZik Frontend
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+## 🚀 Description
+OpenZik is a modern web music streaming application inspired by Spotify.  
+It allows users to:
+- Search for artists, albums, tracks, playlists, and profiles from Spotify.
+- Manage their personal library.
+- Create and view playlists.
+- Play local and streaming music.
+- Access their **Recently Played** history.
 
-## Available Scripts
+This repository contains the **frontend** part of the application, built with **React + Material UI**.
 
-In the project directory, you can run:
+---
 
-### `npm start`
+## 🛠️ Tech Stack
+- **React 18**
+- **Material UI (MUI)** for UI design
+- **React Router** for navigation
+- **Axios / fetch** for API calls
+- **SessionStorage** to persist the global player state
+- **Vite / Create React App** for bundling
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
+---
 
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
+## 📦 Installation
 
-### `npm test`
+Clone the repository:
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+```bash
+git clone https://github.com/<your-repo>/openzik-frontend.git
+cd openzik-frontend
+````
 
-### `npm run build`
+Install dependencies:
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+```bash
+npm install
+```
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+Configure the backend API URL in `src/api.js` (default: `http://localhost:3000`).
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+---
 
-### `npm run eject`
+## ▶️ Development
 
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
+```bash
+npm run dev
+```
 
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+By default, the app runs on `http://localhost:5173` (Vite).
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
+---
 
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
+## 🗂️ Project Structure
 
-## Learn More
+```
+src/
+ ├── api/               # Functions for communicating with the backend (REST API)
+ ├── assets/            # Images and icons
+ ├── components/        # Reusable components (UI, Player, etc.)
+ ├── pages/             # Main pages (Home, Library, Login…)
+ ├── App.jsx            # Main application entry
+ └── main.jsx           # React bootstrap
+```
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
+---
 
-To learn React, check out the [React documentation](https://reactjs.org/).
+## 🔑 Authentication
 
-### Code Splitting
+Authentication is handled using **JWT**, stored on the frontend.
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
+* The token is attached in headers (`Authorization: Bearer <token>`).
+* Some routes (e.g., `/home/recently-played`, `/home/playlists`) require a logged-in user.
 
-### Analyzing the Bundle Size
+---
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
+## 📚 Main Pages
 
-### Making a Progressive Web App
+* **Home**:
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
+  * Recently played tracks
+  * User playlists
+* **Library**:
 
-### Advanced Configuration
+  * Downloaded or local music
+* **Player**:
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
+  * Playback controls (Play / Pause / Next / Previous)
+* **Login / Register**:
 
-### Deployment
+  * Backend authentication (JWT)
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
+---
 
-### `npm run build` fails to minify
+## 🧪 Useful Scripts
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+* `npm run dev` → Start the project in development mode
+* `npm run build` → Build the project for production
+* `npm run preview` → Preview the production build locally
