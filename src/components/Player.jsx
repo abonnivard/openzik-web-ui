@@ -290,46 +290,97 @@ const handlePrev = useCallback(() => {
         <Box sx={{
           position: "fixed",
           left: 0,
-          bottom: 0,
-          width: "100%",
-          height: "75%",
+          top: 56, // Hauteur de la barre du haut
+          right: 0,
+          bottom: 56, // Hauteur de la navbar du bas
           bgcolor: "#121212",
           color: "#fff",
           zIndex: 1100,
-          borderTopLeftRadius: 16,
-          borderTopRightRadius: 16,
-          p: 3,
           display: "flex",
+          width: "100%",
           flexDirection: "column",
           alignItems: "center",
+          justifyContent: "space-between",
           transform: openMobile ? "translateY(0)" : "translateY(100%)",
           transition: "transform 0.3s ease",
         }}>
-          <IconButton onClick={() => setOpenMobile(false)} sx={{ alignSelf: "flex-end", color: "#fff" }}>
-            <CloseIcon />
+          <IconButton onClick={() => setOpenMobile(false)} sx={{ alignSelf: "flex-end", color: "#fff", fontSize: "2rem", mb: 1 }}>
+            <CloseIcon fontSize="large" />
           </IconButton>
-          <Avatar src={currentTrack.image || ""} alt={currentTrack.title} variant="rounded" sx={{ width: 280, height: 280, mb: 2 }} />
-          <Typography variant="h6" noWrap>{currentTrack.title}</Typography>
-          <Typography variant="subtitle1" sx={{ color: "rgba(255,255,255,0.7)", mb: 2 }}>{currentTrack.artist}</Typography>
+          
+          <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", flex: 1, justifyContent: "flex-start", gap: 2, mt: 2 }}>
+            <Avatar 
+              src={currentTrack.image || ""} 
+              alt={currentTrack.title} 
+              variant="rounded" 
+              sx={{ 
+                width: { xs: 300, sm: 350 }, 
+                height: { xs: 300, sm: 350 }, 
+                borderRadius: 3,
+                boxShadow: "0 8px 32px rgba(0,0,0,0.4)"
+              }} 
+            />
+            
+            <Box sx={{ textAlign: "center", width: "100%", mt: 2 }}>
+              <Typography variant="h4" sx={{ fontWeight: 600, mb: 1, fontSize: "1.6rem" }}>
+                {currentTrack.title}
+              </Typography>
+              <Typography variant="h6" sx={{ color: "rgba(255,255,255,0.7)", fontSize: "1.2rem" }}>
+                {currentTrack.artist}
+              </Typography>
+            </Box>
+            
+            <Box sx={{ width: "100%", px: 2 }}>
+              <Slider 
+                value={progress} 
+                max={duration} 
+                onChange={handleSeek} 
+                sx={{ 
+                  color: "#1db954", 
+                  width: "100%", 
+                  mb: 2,
+                  height: 6,
+                  "& .MuiSlider-thumb": { width: 20, height: 20 },
+                  "& .MuiSlider-track": { height: 6 },
+                  "& .MuiSlider-rail": { height: 6, opacity: 0.3 }
+                }} 
+              />
+              <Box sx={{ display: "flex", justifyContent: "space-between", width: "100%" }}>
+                <Typography variant="body2" sx={{ fontSize: "1rem" }}>
+                  {Math.floor(progress / 60)}:{("0" + Math.floor(progress % 60)).slice(-2)}
+                </Typography>
+                <Typography variant="body2" sx={{ fontSize: "1rem" }}>
+                  {Math.floor(duration / 60)}:{("0" + Math.floor(duration % 60)).slice(-2)}
+                </Typography>
+              </Box>
+            </Box>
+          </Box>
 
-          <Slider value={progress} max={duration} onChange={handleSeek} sx={{ color: "#1db954", width: "90%", mb: 2, "& .MuiSlider-thumb": { width: 14, height: 14 } }} />
-          <Typography variant="caption" sx={{ mb: 2 }}>{Math.floor(progress / 60)}:{("0" + Math.floor(progress % 60)).slice(-2)} / {Math.floor(duration / 60)}:{("0" + Math.floor(duration % 60)).slice(-2)}</Typography>
-
-          <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
-            <IconButton onClick={toggleShuffle} sx={{ color: isShuffle ? "#1db954" : "#fff" }}>
-              <ShuffleIcon />
+          <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 3, mb: 10 }}>
+            <IconButton onClick={toggleShuffle} sx={{ color: isShuffle ? "#1db954" : "#fff", fontSize: "2rem" }}>
+              <ShuffleIcon fontSize="large" />
             </IconButton>
-            <IconButton onClick={handlePrev} sx={{ color: "#fff" }}>
-              <SkipPreviousIcon fontSize="large" />
+            <IconButton onClick={handlePrev} sx={{ color: "#fff", fontSize: "2.5rem" }}>
+              <SkipPreviousIcon fontSize="inherit" />
             </IconButton>
-            <IconButton onClick={togglePlay} sx={{ color: "#1db954", bgcolor: "rgba(29,185,84,0.1)" }}>
-              {isPlaying ? <PauseIcon fontSize="large" /> : <PlayArrowIcon fontSize="large" />}
+            <IconButton 
+              onClick={togglePlay} 
+              sx={{ 
+                color: "#fff", 
+                bgcolor: "#1db954",
+                fontSize: "3rem",
+                width: 70,
+                height: 70,
+                "&:hover": { bgcolor: "#1ed760" }
+              }}
+            >
+              {isPlaying ? <PauseIcon fontSize="inherit" /> : <PlayArrowIcon fontSize="inherit" />}
             </IconButton>
-            <IconButton onClick={handleNext} sx={{ color: "#fff" }}>
-              <SkipNextIcon fontSize="large" />
+            <IconButton onClick={handleNext} sx={{ color: "#fff", fontSize: "2.5rem" }}>
+              <SkipNextIcon fontSize="inherit" />
             </IconButton>
-            <IconButton onClick={toggleRepeat} sx={{ color: repeatMode !== "off" ? "#1db954" : "#fff" }}>
-              {repeatMode === "one" ? <RepeatOneIcon /> : <RepeatIcon />}
+            <IconButton onClick={toggleRepeat} sx={{ color: repeatMode !== "off" ? "#1db954" : "#fff", fontSize: "2rem" }}>
+              {repeatMode === "one" ? <RepeatOneIcon fontSize="large" /> : <RepeatIcon fontSize="large" />}
             </IconButton>
           </Box>
         </Box>

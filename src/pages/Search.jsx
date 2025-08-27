@@ -3,8 +3,6 @@ import { CircularProgress, Box, Typography, TextField } from "@mui/material";
 import ArtistList from "../components/ArtistList";
 import AlbumList from "../components/AlbumList";
 import TrackList from "../components/TrackList";
-import PlaylistList from "../components/PlaylistList";
-import UserList from "../components/UserList";
 import { apiSearch, apiDownload } from "../api";
 
 export default function Search({ setToast }) {
@@ -62,6 +60,7 @@ export default function Search({ setToast }) {
         display: "flex",
         flexDirection: "column",
         gap: 2,
+        pb: 12
       }}
     >
       <Typography variant="h5" sx={{ fontWeight: 700 }}>
@@ -97,8 +96,6 @@ export default function Search({ setToast }) {
           <ArtistList artists={data.artists} />
           <AlbumList albums={data.albums} onDownload={handleDownload} />
           <TrackList tracks={data.tracks} onDownload={handleDownload} />
-          <PlaylistList playlists={data.playlists} />
-          <UserList users={data.users} />
         </Box>
       )}
     </Box>

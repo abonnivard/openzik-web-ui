@@ -214,7 +214,7 @@ export default function Library({ setToast }) {
       : null;
 
   return (
-    <Box sx={{ display: "flex", flexDirection: "column", gap: 3 }}>
+    <Box sx={{ display: "flex", flexDirection: "column", gap: 3, pb: 12 }}>
       <Typography variant="h5" sx={{ fontWeight: 700 }}>
         Ma Bibliothèque
       </Typography>

@@ -20,6 +20,7 @@ import FavoriteIcon from "@mui/icons-material/Favorite";
 import FavoriteBorderIcon from "@mui/icons-material/FavoriteBorder";
 import PlaylistAddIcon from "@mui/icons-material/PlaylistAdd";
 import DeleteIcon from "@mui/icons-material/Delete";
+import { PushPin, PushPinOutlined } from "@mui/icons-material";
 import like from "../assets/like.png";
 import {
   apiGetPlaylists,
@@ -31,7 +32,8 @@ import {
   apiGetPlaylistTracks,
   apiDeletePlaylist,
   apiRemoveTrackFromPlaylist,
-  apiAddRecentlyPlayed
+  apiAddRecentlyPlayed,
+  apiPinPlaylist
 } from "../api";
 
 // ---------------- Utils ----------------
@@ -190,6 +192,20 @@ export default function UserPlaylists({ setToast }) {
     } catch (e) { console.error(e); }
   };
 
+  // ----- Pin/Unpin playlist -----
+  const handlePinPlaylist = async (playlistId, isPinned) => {
+    try {
+      await apiPinPlaylist(playlistId, !isPinned);
+      setPlaylists(playlists.map(pl => 
+        pl.id === playlistId ? { ...pl, is_pinned: !isPinned } : pl
+      ));
+      setToast({ message: `Playlist ${!isPinned ? 'épinglée' : 'désépinglée'}`, severity: "success" });
+    } catch (e) { 
+      console.error(e);
+      setToast({ message: `Erreur lors du pin/unpin`, severity: "error" });
+    }
+  };
+
   // ----- Supprimer un track d'une playlist -----
   const handleRemoveTrackFromPlaylist = async (playlistId, trackId) => {
     try {
@@ -214,12 +230,19 @@ export default function UserPlaylists({ setToast }) {
 
   const displayPlaylists = [
     { id: "liked", name: "Liked Tracks", tracks: likedTracksList },
-    ...playlists.map(pl => ({ ...pl, tracks: playlistTracks[pl.id] || [] }))
+    ...playlists
+      .map(pl => ({ ...pl, tracks: playlistTracks[pl.id] || [] }))
+      .sort((a, b) => {
+        // Trie par is_pinned d'abord (pinned en premier), puis par created_at
+        if (a.is_pinned && !b.is_pinned) return -1;
+        if (!a.is_pinned && b.is_pinned) return 1;
+        return new Date(b.created_at) - new Date(a.created_at);
+      })
   ];
 
   // ----- Render -----
   return (
-    <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
+    <Box sx={{ display: "flex", flexDirection: "column", gap: 2, pb: 12 }}>
       <Typography variant="h5" sx={{ fontWeight: 700 }}>Playlists</Typography>
 
       {/* Liste des playlists */}
@@ -249,19 +272,41 @@ export default function UserPlaylists({ setToast }) {
               {pl.tracks.length} titres
             </Typography>
           </Box>
-          {pl.id !== "liked" && (
-            <IconButton
-              onClick={() => handleDeletePlaylist(pl.id)}
-              sx={{
-                color: "rgba(255,255,255,0.4)",
-                "&:hover": { color: "#1db954" },
-                width: isMobile ? 28 : 36,
-                height: isMobile ? 28 : 36
-              }}
-            >
-              <DeleteIcon fontSize={isMobile ? "small" : "medium"} />
-            </IconButton>
-          )}
+          <Box sx={{ display: "flex", gap: 1 }}>
+            {pl.id !== "liked" && (
+              <IconButton
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handlePinPlaylist(pl.id, pl.is_pinned);
+                }}
+                sx={{
+                  color: pl.is_pinned ? "#1db954" : "rgba(255,255,255,0.4)",
+                  "&:hover": { color: "#1db954" },
+                  width: isMobile ? 28 : 36,
+                  height: isMobile ? 28 : 36
+                }}
+                title={pl.is_pinned ? "Désépingler" : "Épingler"}
+              >
+                {pl.is_pinned ? <PushPin fontSize={isMobile ? "small" : "medium"} /> : <PushPinOutlined fontSize={isMobile ? "small" : "medium"} />}
+              </IconButton>
+            )}
+            {pl.id !== "liked" && (
+              <IconButton
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleDeletePlaylist(pl.id);
+                }}
+                sx={{
+                  color: "rgba(255,255,255,0.4)",
+                  "&:hover": { color: "#1db954" },
+                  width: isMobile ? 28 : 36,
+                  height: isMobile ? 28 : 36
+                }}
+              >
+                <DeleteIcon fontSize={isMobile ? "small" : "medium"} />
+              </IconButton>
+            )}
+          </Box>
         </Paper>
       ))}
 

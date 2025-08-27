@@ -104,6 +104,13 @@ export const apiDeletePlaylist = (playlistId) =>
 export const apiGetPlaylistTracks = (playlistId) =>
   requestWithToken(`/playlists/${playlistId}/tracks`);
 
+// Pin/Unpin une playlist
+export const apiPinPlaylist = (playlistId, isPinned) =>
+  requestWithToken(`/playlists/${playlistId}/pin`, {
+    method: "PUT",
+    body: JSON.stringify({ isPinned }),
+  });
+
 
 // Likes
 export const apiGetLikedTracks = () => requestWithToken(`/likes`);
@@ -128,3 +135,15 @@ requestWithToken("/music/track-played", {
 // Récupérer les titres récemment joués
 export const apiGetRecentlyPlayed = () =>
   requestWithToken("/home/recently-played");
+
+// Récupérer les top 5 tracks les plus écoutés
+export const apiGetTopTracks = () =>
+  requestWithToken("/stats/top-tracks");
+
+// Récupérer des artistes aléatoires
+export const apiGetRandomArtists = (limit = 5) =>
+  requestWithToken(`/stats/random-artists?limit=${limit}`);
+
+// Récupérer les statistiques générales de l'utilisateur
+export const apiGetUserStats = () =>
+  requestWithToken("/stats/user-stats");
