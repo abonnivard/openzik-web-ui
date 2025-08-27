@@ -1,7 +1,7 @@
 # 🎵 OpenZik Frontend
 
 ## 🚀 Description
-OpenZik is a modern web music streaming application inspired by Spotify.  
+OpenZik is a modern open-source web music streaming application inspired by Spotify and designed to run with qBittorrent and Prowlarr.  
 It allows users to:
 - Search for artists, albums, tracks, playlists, and profiles from Spotify and download it locally with qBittorrent and Prowlarr.
 - Manage their personal library.
