@@ -2,59 +2,60 @@
 
 ## 🚀 Description
 OpenZik is a modern open-source web music streaming application inspired by Spotify and designed to run with qBittorrent and Prowlarr.  
-It allows users to:
-- Search for artists, albums, tracks, playlists, and profiles from Spotify and download it locally with qBittorrent and Prowlarr.
-- Manage their personal library.
-- Create and view playlists.
-- Play local and streaming music.
-- Access their **Recently Played** history.
-
-This repository contains the **frontend** part of the application, built with **React + Material UI**.
-
----
-
-## 🛠️ Tech Stack
-- **React 18**
 - **Material UI (MUI)** for UI design
-- **React Router** for navigation
-- **Axios / fetch** for API calls
-- **SessionStorage** to persist the global player state
-- **Vite / Create React App** for bundling
 
----
+# Music Web Frontend
 
-## 📦 Installation
+This is the frontend for the OpenZik music application. It provides a modern, Spotify-like interface for searching, downloading, and managing your music library.
 
-Clone the repository:
+## Main Features
+- Search for artists, tracks, albums, playlists, and Spotify profiles
+- Download tracks, albums, and playlists from the backend
+- Manage and play your personal music library
+- Responsive design (desktop & mobile)
+- User authentication and account management
 
-```bash
-git clone https://github.com/<your-repo>/openzik-frontend.git
-cd openzik-frontend
-````
-
-Install dependencies:
-
-```bash
-npm install
+## Project Structure
+```
+```
+├── public/                # Static files (index.html, icons, manifest)
+├── src/
+│   ├── assets/            # Images and logos
+│   ├── components/        # UI components (Sidebar, Player, SearchBar, etc.)
+│   ├── pages/             # Main pages (Home, Search, Library, Account, Login)
+│   ├── utils/             # Utility functions
+│   ├── api.js             # API calls to backend
+│   ├── App.jsx            # Main app component
+│   ├── index.js           # Entry point
+│   └── ...
+├── package.json           # Project dependencies
+├── .env                   # Environment variables
 ```
 
-Configure the backend API URL in `src/api.js` (default: `http://localhost:3000`).
+## Installation
+1. Install Node.js and npm
+2. Clone the repository
+3. Install dependencies:
+  ```bash
+  npm install
+  ```
+4. Configure the `.env` file if needed
+5. Start the development server:
+  ```bash
+  npm start
+  ```
 
----
+## Usage
+- The frontend communicates with the backend via REST API (see backend README)
+- All music management, search, and download features are available from the UI
+- User authentication is required for most features
 
-## ▶️ Development
+## Contribution
+- Fork, create a branch, submit a pull request
+- Follow the project structure and conventions
 
-```bash
-npm run dev
-```
-
-By default, the app runs on `http://localhost:5173` (Vite).
-
----
-
-## 🗂️ Project Structure
-
-```
+## License
+MIT
 src/
  ├── api/               # Functions for communicating with the backend (REST API)
  ├── assets/            # Images and icons
