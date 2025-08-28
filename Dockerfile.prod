@@ -27,8 +27,9 @@ WORKDIR /app
 # Installer serve globalement
 RUN npm install -g serve
 
-# Créer un utilisateur non-root
-RUN adduser -S frontend -u 1001
+# Créer un groupe et un utilisateur non-root
+RUN addgroup -g 1001 frontend && \
+    adduser -S -u 1001 -G frontend frontend
 
 # Copier les fichiers buildés
 COPY --from=build /app/build ./build

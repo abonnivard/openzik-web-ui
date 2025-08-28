@@ -1,6 +1,6 @@
 // Utility functions for the frontend
 
-const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || "http://localhost:3001";
+const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || "http://localhost:3000";
 
 // Generate file URL from file path
 export const getFileUrl = (filePath) => {
