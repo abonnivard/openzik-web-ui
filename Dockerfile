@@ -1,5 +1,5 @@
 # Build stage
-FROM node:18-alpine as build
+FROM node:18-alpine AS build
 
 WORKDIR /app
 
@@ -26,8 +26,7 @@ FROM nginx:alpine
 RUN apk update && apk upgrade
 
 # Create non-root user
-RUN addgroup -g 1001 -S nginx && \
-    adduser -S frontend -u 1001 -G nginx
+RUN adduser -S frontend -u 1001 -G nginx
 
 # Copy built app from build stage
 COPY --from=build /app/build /usr/share/nginx/html
