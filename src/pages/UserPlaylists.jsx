@@ -5,23 +5,18 @@ import {
   Avatar,
   Paper,
   IconButton,
-  Menu,
-  MenuItem,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  TextField,
-  DialogActions,
-  Button,
   useTheme,
   useMediaQuery
 } from "@mui/material";
 import FavoriteIcon from "@mui/icons-material/Favorite";
 import FavoriteBorderIcon from "@mui/icons-material/FavoriteBorder";
-import PlaylistAddIcon from "@mui/icons-material/PlaylistAdd";
 import DeleteIcon from "@mui/icons-material/Delete";
 import { PushPin, PushPinOutlined } from "@mui/icons-material";
 import like from "../assets/like.png";
+import TrackMenu from "../components/TrackMenu";
+import CreatePlaylistDialog from "../components/CreatePlaylistDialog";
+import PlaylistMenu from "../components/PlaylistMenu";
+import ImageUploader from "../components/ImageUploader";
 import {
   apiGetPlaylists,
   apiGetLikedTracks,
@@ -33,7 +28,9 @@ import {
   apiDeletePlaylist,
   apiRemoveTrackFromPlaylist,
   apiAddRecentlyPlayed,
-  apiPinPlaylist
+  apiPinPlaylist,
+  apiUploadPlaylistImage,
+  apiRemovePlaylistImage
 } from "../api";
 
 // ---------------- Utils ----------------
@@ -45,7 +42,23 @@ export async function playTrack(track) {
   try {
     await apiAddRecentlyPlayed(track.id);
   } catch (err) {
-    console.error("Erreur ajout récemment joué :", err);
+    console.error("Error adding to recently played:", err);
+  }
+}
+
+// Function to add to queue
+function addToQueue(track, setToast) {
+  if (window.addToQueue) {
+    window.addToQueue(track);
+    if (setToast) {
+      setToast({ message: `"${track.title}" added to queue`, severity: "success" });
+    }
+    console.log(`Track added to queue: ${track.title}`);
+  } else {
+    console.warn("Player queue system not available");
+    if (setToast) {
+      setToast({ message: "Queue system not available", severity: "error" });
+    }
   }
 }
 
@@ -95,35 +108,73 @@ export default function UserPlaylists({ setToast }) {
     const saved = sessionStorage.getItem("selectedPlaylist");
     return saved ? JSON.parse(saved) : null;
   });
-  const [anchorEl, setAnchorEl] = useState(null);
-  const [currentTrackForPlaylist, setCurrentTrackForPlaylist] = useState(null);
   const [likedTracksList, setLikedTracksList] = useState([]);
 
   // Dialog création playlist
   const [openCreateDialog, setOpenCreateDialog] = useState(false);
-  const [newPlaylistName, setNewPlaylistName] = useState("");
 
   // ----- Fetch data -----
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const pls = await apiGetPlaylists();
-        setPlaylists(pls);
+        const [playlistsData, likedData] = await Promise.all([
+          apiGetPlaylists(),
+          apiGetLikedTracks()
+        ]);
 
-        const liked = await apiGetLikedTracks();
-        setLikedTracks(liked.map(t => t.id));
-        setLikedTracksList(liked.map(t => ({
-          ...t,
-          url: `http://localhost:3000/${t.file_path.split(/[\\/]/).map(encodeURIComponent).join("/")}`
-        })));
+        const likedTracks = likedData.map(t => t.id);
+        setLikedTracks(likedTracks);
 
-        const tracksMap = {};
-        for (let pl of pls) {
-          const tracks = await apiGetPlaylistTracks(pl.id);
-          tracksMap[pl.id] = tracks.map(t => ({
+        // Filtrer les playlists pour éviter les doublons "Liked" (enlever celles qui pourraient déjà exister)
+        const filteredPlaylists = playlistsData.filter(p => 
+          !p.name.toLowerCase().includes('liked') && 
+          p.id !== 'liked'
+        );
+
+        // Récupérer les tracks pour chaque playlist (sans les liked)
+        const playlistsWithTracks = await Promise.all(
+          filteredPlaylists.map(async (playlist) => {
+            try {
+              const tracks = await apiGetPlaylistTracks(playlist.id);
+              return {
+                ...playlist,
+                tracks: tracks.map(t => ({
+                  ...t,
+                  url: `http://localhost:3000/${t.file_path.split(/[\\/]/).map(encodeURIComponent).join("/")}`
+                }))
+              };
+            } catch (error) {
+              console.error(`Erreur récupération tracks playlist ${playlist.id}:`, error);
+              return { ...playlist, tracks: [] };
+            }
+          })
+        );
+
+        // Créer une playlist "Liked Songs" virtuelle
+        const likedPlaylist = {
+          id: 'liked',
+          name: 'Liked Songs',
+          tracks: likedData.map(t => ({
             ...t,
             url: `http://localhost:3000/${t.file_path.split(/[\\/]/).map(encodeURIComponent).join("/")}`
-          }));
+          })),
+          image: likedData[0]?.image || null,
+          isLikedPlaylist: true
+        };
+
+        // Combiner liked playlist en première position et autres playlists
+        const allPlaylists = [likedPlaylist, ...playlistsWithTracks];
+        setPlaylists(allPlaylists);
+
+        // Créer le map des tracks pour compatibilité
+        const tracksMap = {};
+        tracksMap['liked'] = likedData.map(t => ({
+          ...t,
+          url: `http://localhost:3000/${t.file_path.split(/[\\/]/).map(encodeURIComponent).join("/")}`
+        }));
+        
+        for (let pl of playlistsWithTracks) {
+          tracksMap[pl.id] = pl.tracks;
         }
         setPlaylistTracks(tracksMap);
       } catch (e) {
@@ -133,49 +184,162 @@ export default function UserPlaylists({ setToast }) {
     fetchData();
   }, []);
 
+  // Listen for liked tracks changes from other components
+  useEffect(() => {
+    const handleLikedTracksChanged = async () => {
+      try {
+        const liked = await apiGetLikedTracks();
+        setLikedTracks(liked.map(t => t.id));
+        const formattedLiked = liked.map(t => ({
+          ...t,
+          url: `http://localhost:3000/${t.file_path.split(/[\\/]/).map(encodeURIComponent).join("/")}`
+        }));
+        setLikedTracksList(formattedLiked);
+        
+        // Update the liked playlist in the playlists array
+        setPlaylists(prevPlaylists => {
+          const updatedPlaylists = [...prevPlaylists];
+          const likedPlaylistIndex = updatedPlaylists.findIndex(p => p.isLikedPlaylist);
+          if (likedPlaylistIndex !== -1) {
+            updatedPlaylists[likedPlaylistIndex] = {
+              ...updatedPlaylists[likedPlaylistIndex],
+              tracks: formattedLiked,
+              image: formattedLiked[0]?.image || null
+            };
+          }
+          return updatedPlaylists;
+        });
+        
+        // If currently viewing liked playlist, update displayed tracks
+        if (selectedPlaylist?.isLikedPlaylist) {
+          // Update the displayed tracks for liked playlist
+          setPlaylistTracks(prev => ({
+            ...prev,
+            liked: formattedLiked
+          }));
+        }
+      } catch (error) {
+        console.error("Error updating liked tracks:", error);
+      }
+    };
+
+    window.addEventListener('likedTracksChanged', handleLikedTracksChanged);
+    return () => {
+      window.removeEventListener('likedTracksChanged', handleLikedTracksChanged);
+    };
+  }, [selectedPlaylist?.isLikedPlaylist]);
+
   // ----- Like / Unlike -----
   const handleLike = async (track) => {
     try {
       if (likedTracks.includes(track.id)) {
         await apiUnlikeTrack(track.id);
-        setLikedTracks(likedTracks.filter(id => id !== track.id));
+        setLikedTracks(prev => prev.filter(id => id !== track.id));
+        if (setToast) {
+          setToast({ message: `"${track.title}" removed from favorites`, severity: "info" });
+        }
       } else {
         await apiLikeTrack(track.id);
-        setLikedTracks([...likedTracks, track.id]);
+        setLikedTracks(prev => [...prev, track.id]);
+        if (setToast) {
+          setToast({ message: `"${track.title}" added to favorites`, severity: "success" });
+        }
       }
-    } catch (e) { console.error(e); }
+      
+      // Immediate update of liked tracks like in Home
+      try {
+        const liked = await apiGetLikedTracks();
+        const likedIds = liked.map(t => t.id);
+        setLikedTracks(likedIds);
+        
+        const formattedLiked = liked.map(t => ({
+          ...t,
+          url: `http://localhost:3000/${t.file_path.split(/[\\/]/).map(encodeURIComponent).join("/")}`
+        }));
+        setLikedTracksList(formattedLiked);
+        
+        // Update the liked playlist in the playlists array immediately
+        setPlaylists(prevPlaylists => {
+          const updatedPlaylists = [...prevPlaylists];
+          const likedPlaylistIndex = updatedPlaylists.findIndex(p => p.isLikedPlaylist);
+          if (likedPlaylistIndex !== -1) {
+            updatedPlaylists[likedPlaylistIndex] = {
+              ...updatedPlaylists[likedPlaylistIndex],
+              tracks: formattedLiked,
+              image: formattedLiked[0]?.image || null
+            };
+          }
+          return updatedPlaylists;
+        });
+        
+        // If currently viewing liked playlist, update displayed tracks
+        if (selectedPlaylist?.isLikedPlaylist) {
+          setPlaylistTracks(prev => ({
+            ...prev,
+            liked: formattedLiked
+          }));
+        }
+      } catch (updateError) {
+        console.error("Error updating liked tracks after like/unlike:", updateError);
+      }
+      
+      // Dispatch event to notify other components
+      window.dispatchEvent(new CustomEvent('likedTracksChanged'));
+    } catch (error) {
+      console.error("Error toggling like:", error);
+      if (setToast) {
+        setToast({ message: "Error updating favorites", severity: "error" });
+      }
+    }
   };
 
-  // ----- Playlist menu -----
-  const handleOpenPlaylistMenu = (event, track) => {
-    setAnchorEl(event.currentTarget);
-    setCurrentTrackForPlaylist(track);
-  };
-  const handleClosePlaylistMenu = () => {
-    setAnchorEl(null);
-    setCurrentTrackForPlaylist(null);
-  };
-  const handleAddToPlaylist = async (playlistId) => {
-    if (!currentTrackForPlaylist) return;
+  // Handle add to playlist
+  const handleAddToPlaylist = async (playlistId, track) => {
     try {
-      await apiAddTrackToPlaylist(playlistId, currentTrackForPlaylist.id);
-      const updated = [...(playlistTracks[playlistId] || []), currentTrackForPlaylist];
+      // Check if track is already in the playlist
+      const currentTracks = playlistTracks[playlistId] || [];
+      const trackExists = currentTracks.some(t => t.id === track.id);
+      
+      if (trackExists) {
+        const playlist = playlists.find(p => p.id === playlistId);
+        setToast({ message: `"${track.title}" is already in "${playlist?.name}"`, severity: "warning" });
+        return;
+      }
+
+      await apiAddTrackToPlaylist(playlistId, track.id);
+      const updated = [...(playlistTracks[playlistId] || []), track];
       setPlaylistTracks({ ...playlistTracks, [playlistId]: updated });
-      setToast({ message: `Track ajouté à la playlist !`, severity: "success" });
-      handleClosePlaylistMenu();
-    } catch (e) { console.error(e); }
+      
+      // Update selectedPlaylist if it's the playlist we just added to
+      if (selectedPlaylist?.id === playlistId) {
+        setSelectedPlaylist({ ...selectedPlaylist, tracks: updated });
+      }
+      
+      const playlist = playlists.find(p => p.id === playlistId);
+      setToast({ message: `"${track.title}" added to "${playlist?.name}"`, severity: "success" });
+      // Dispatch event to notify other components
+      window.dispatchEvent(new CustomEvent('playlistsChanged'));
+    } catch (e) { 
+      console.error(e);
+      setToast({ message: "Error adding to playlist", severity: "error" });
+    }
   };
 
-  // ----- Créer playlist -----
-  const handleCreatePlaylist = async () => {
-    if (!newPlaylistName) return;
+  // Handle create new playlist (called from PlaylistMenu)
+  const handleCreatePlaylist = (track) => {
+    setOpenCreateDialog(true);
+  };
+
+  // Handle actual playlist creation with name
+  const handleCreatePlaylistWithName = async (playlistName) => {
     try {
-      const newPl = await apiCreatePlaylist(newPlaylistName);
+      const newPl = await apiCreatePlaylist(playlistName);
       setPlaylists([...playlists, newPl]);
       setPlaylistTracks({ ...playlistTracks, [newPl.id]: [] });
-      setToast({ message: `Playlist créée : ${newPlaylistName}`, severity: "success" });
-      setNewPlaylistName("");
+      setToast({ message: `Playlist créée : ${playlistName}`, severity: "success" });
       setOpenCreateDialog(false);
+      // Dispatch event to notify other components
+      window.dispatchEvent(new CustomEvent('playlistsChanged'));
     } catch (e) { console.error(e); }
   };
 
@@ -189,6 +353,8 @@ export default function UserPlaylists({ setToast }) {
       setPlaylistTracks(newTracks);
       setToast({ message: `Playlist supprimée`, severity: "success" });
       if (selectedPlaylist?.id === playlistId) setSelectedPlaylist(null);
+      // Dispatch event to notify other components
+      window.dispatchEvent(new CustomEvent('playlistsChanged'));
     } catch (e) { console.error(e); }
   };
 
@@ -216,7 +382,60 @@ export default function UserPlaylists({ setToast }) {
         setSelectedPlaylist({ ...selectedPlaylist, tracks: updated });
       }
       setToast({ message: `Track supprimé de la playlist`, severity: "success" });
+      // Dispatch event to notify other components
+      window.dispatchEvent(new CustomEvent('playlistsChanged'));
     } catch (e) { console.error(e); }
+  };
+
+  // ----- Gestion des images de playlist -----
+  const handlePlaylistImageUpload = async (playlistId, imageData) => {
+    try {
+      await apiUploadPlaylistImage(playlistId, imageData);
+      
+      // Mettre à jour la playlist dans l'état local
+      setPlaylists(prevPlaylists => 
+        prevPlaylists.map(pl => 
+          pl.id === playlistId ? { ...pl, custom_image: imageData } : pl
+        )
+      );
+      
+      // Mettre à jour selectedPlaylist si c'est celle qu'on modifie
+      if (selectedPlaylist?.id === playlistId) {
+        setSelectedPlaylist(prev => ({ ...prev, custom_image: imageData }));
+      }
+      
+      setToast({ message: "Image de playlist mise à jour ✅", severity: "success" });
+      // Dispatch event to notify other components
+      window.dispatchEvent(new CustomEvent('playlistsChanged'));
+    } catch (error) {
+      console.error("Error uploading playlist image:", error);
+      setToast({ message: "Erreur lors de l'upload ❌", severity: "error" });
+    }
+  };
+
+  const handlePlaylistImageRemove = async (playlistId) => {
+    try {
+      await apiRemovePlaylistImage(playlistId);
+      
+      // Mettre à jour la playlist dans l'état local
+      setPlaylists(prevPlaylists => 
+        prevPlaylists.map(pl => 
+          pl.id === playlistId ? { ...pl, custom_image: null } : pl
+        )
+      );
+      
+      // Mettre à jour selectedPlaylist si c'est celle qu'on modifie
+      if (selectedPlaylist?.id === playlistId) {
+        setSelectedPlaylist(prev => ({ ...prev, custom_image: null }));
+      }
+      
+      setToast({ message: "Image de playlist supprimée ✅", severity: "success" });
+      // Dispatch event to notify other components
+      window.dispatchEvent(new CustomEvent('playlistsChanged'));
+    } catch (error) {
+      console.error("Error removing playlist image:", error);
+      setToast({ message: "Erreur lors de la suppression ❌", severity: "error" });
+    }
   };
 
   // ----- Persist selected playlist -----
@@ -228,12 +447,60 @@ export default function UserPlaylists({ setToast }) {
     }
   }, [selectedPlaylist]);
 
+  // Listen for playlist changes from other components
+  useEffect(() => {
+    const handlePlaylistsChanged = () => {
+      console.log('Playlists changed event received in UserPlaylists');
+      const fetchData = async () => {
+        try {
+          const [playlistsData, likedData] = await Promise.all([
+            apiGetPlaylists(),
+            apiGetLikedTracks()
+          ]);
+
+          setPlaylists(playlistsData);
+          setLikedTracks(likedData.map(t => t.id));
+          setLikedTracksList(likedData.map(t => ({
+            ...t,
+            url: `http://localhost:3000/${t.file_path.split(/[\\/]/).map(encodeURIComponent).join("/")}`
+          })));
+
+          // Load tracks for each playlist
+          const tracksData = {};
+          for (const playlist of playlistsData) {
+            try {
+              const tracks = await apiGetPlaylistTracks(playlist.id);
+              tracksData[playlist.id] = tracks.map(t => ({
+                ...t,
+                url: `http://localhost:3000/${t.file_path.split(/[\\/]/).map(encodeURIComponent).join("/")}`
+              }));
+            } catch (error) {
+              console.error(`Error loading tracks for playlist ${playlist.id}:`, error);
+              tracksData[playlist.id] = [];
+            }
+          }
+          setPlaylistTracks(tracksData);
+        } catch (error) {
+          console.error("Error fetching data:", error);
+        }
+      };
+      fetchData();
+    };
+
+    window.addEventListener('playlistsChanged', handlePlaylistsChanged);
+
+    return () => {
+      window.removeEventListener('playlistsChanged', handlePlaylistsChanged);
+    };
+  }, []);
+
   const displayPlaylists = [
-    { id: "liked", name: "Liked Tracks", tracks: likedTracksList },
     ...playlists
       .map(pl => ({ ...pl, tracks: playlistTracks[pl.id] || [] }))
       .sort((a, b) => {
         // Trie par is_pinned d'abord (pinned en premier), puis par created_at
+        if (a.isLikedPlaylist && !b.isLikedPlaylist) return -1;
+        if (!a.isLikedPlaylist && b.isLikedPlaylist) return 1;
         if (a.is_pinned && !b.is_pinned) return -1;
         if (!a.is_pinned && b.is_pinned) return 1;
         return new Date(b.created_at) - new Date(a.created_at);
@@ -261,7 +528,7 @@ export default function UserPlaylists({ setToast }) {
           }}
         >
           <Avatar
-            src={pl.id === "liked" ? like : pl.tracks[0]?.image || ""}
+            src={pl.isLikedPlaylist ? like : (pl.custom_image || pl.tracks[0]?.image || "")}
             variant="rounded"
             sx={{ width: isMobile ? 40 : 50, height: isMobile ? 40 : 50 }}
             onClick={() => setSelectedPlaylist(pl)}
@@ -273,7 +540,7 @@ export default function UserPlaylists({ setToast }) {
             </Typography>
           </Box>
           <Box sx={{ display: "flex", gap: 1 }}>
-            {pl.id !== "liked" && (
+            {!pl.isLikedPlaylist && (
               <IconButton
                 onClick={(e) => {
                   e.stopPropagation();
@@ -290,7 +557,7 @@ export default function UserPlaylists({ setToast }) {
                 {pl.is_pinned ? <PushPin fontSize={isMobile ? "small" : "medium"} /> : <PushPinOutlined fontSize={isMobile ? "small" : "medium"} />}
               </IconButton>
             )}
-            {pl.id !== "liked" && (
+            {!pl.isLikedPlaylist && (
               <IconButton
                 onClick={(e) => {
                   e.stopPropagation();
@@ -314,15 +581,52 @@ export default function UserPlaylists({ setToast }) {
       {selectedPlaylist?.tracks && (
         <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
           <Typography
-            sx={{ color: "#1db954", cursor: "pointer" }}
+            sx={{ color: "#1db954", cursor: "pointer", mb: 2 }}
             onClick={() => setSelectedPlaylist(null)}
           >
             ← Back to playlists
           </Typography>
 
-          <Typography variant="h6" sx={{ color: "#fff", fontWeight: 700, mb: 2 }}>
-            {selectedPlaylist.name}
-          </Typography>
+            <Box sx={{ mb: 3 }}>
+                <Box sx={{ display: "flex", alignItems: "center", gap: 2, mb: 2 }}>
+                  {!selectedPlaylist.isLikedPlaylist ? (
+                    <ImageUploader
+                      currentImage={selectedPlaylist.custom_image || selectedPlaylist.tracks[0]?.image}
+                      onImageUpload={(imageData) => handlePlaylistImageUpload(selectedPlaylist.id, imageData)}
+                      onImageRemove={() => handlePlaylistImageRemove(selectedPlaylist.id)}
+                      size={isMobile ? 80 : 120}
+                      isRound={false}
+                      label="Playlist Cover"
+                    />
+                  ) : (
+                    <Avatar
+                      variant="rounded"
+                      src={like}
+                      sx={{ 
+                        width: isMobile ? 80 : 120, 
+                        height: isMobile ? 80 : 120,
+                        border: "2px solid #1db954"
+                      }}
+                    />
+                  )}
+                  <Box>
+                    <Typography sx={{ 
+                      color: "#fff", 
+                      fontWeight: 700, 
+                      fontSize: isMobile ? "1.5rem" : "2rem",
+                      mb: 1
+                    }}>
+                      {selectedPlaylist.name}
+                    </Typography>
+                    <Typography sx={{ 
+                      color: "rgba(255,255,255,0.7)", 
+                      fontSize: isMobile ? "0.9rem" : "1rem"
+                    }}>
+                      {selectedPlaylist.tracks.length} tracks
+                    </Typography>
+                  </Box>
+                </Box>
+              </Box>
 
           {selectedPlaylist.tracks.map((track, idx) => (
             <Paper
@@ -331,22 +635,46 @@ export default function UserPlaylists({ setToast }) {
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "space-between",
-                p: 1,
+                p: isMobile ? 1 : 1.5,
                 bgcolor: "rgba(255,255,255,0.05)",
                 borderRadius: 1,
                 "&:hover": { bgcolor: "rgba(29,219,84,0.1)" },
+                minHeight: isMobile ? 56 : 64,
+                gap: 1,
               }}
             >
-              <Box sx={{ display: "flex", alignItems: "center", gap: 2, cursor: "pointer" }} onClick={() => playTrack(track)}>
+              <Box sx={{ 
+                display: "flex", 
+                alignItems: "center", 
+                gap: 2, 
+                cursor: "pointer", 
+                flex: 1, 
+                minWidth: 0 
+              }} onClick={() => playTrack(track)}>
                 <Avatar
                   variant="rounded"
                   src={track.image || ""}
                   alt={track.title || "Track"}
-                  sx={{ width: isMobile ? 36 : 48, height: isMobile ? 36 : 48 }}
+                  sx={{ width: isMobile ? 36 : 48, height: isMobile ? 36 : 48, flexShrink: 0 }}
                 />
-                <Box sx={{ overflow: "hidden", minWidth: 0 }}>
-                  <MarqueeText text={track.title || "Unknown Title"} />
-                  <Typography sx={{ color: "rgba(255,255,255,0.7)", fontSize: "0.8rem" }}>
+                <Box sx={{ overflow: "hidden", minWidth: 0, flex: 1 }}>
+                  <Typography sx={{ 
+                    color: "#fff", 
+                    fontWeight: 600,
+                    fontSize: isMobile ? "0.9rem" : "1rem",
+                    whiteSpace: "nowrap",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis"
+                  }}>
+                    {track.title || "Unknown Title"}
+                  </Typography>
+                  <Typography sx={{ 
+                    color: "rgba(255,255,255,0.7)", 
+                    fontSize: isMobile ? "0.75rem" : "0.8rem",
+                    whiteSpace: "nowrap",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis"
+                  }}>
                     {track.artist || "Unknown Artist"}
                   </Typography>
                 </Box>
@@ -364,14 +692,14 @@ export default function UserPlaylists({ setToast }) {
                   )}
                 </IconButton>
 
-                <IconButton
-                  onClick={(e) => handleOpenPlaylistMenu(e, track)}
-                  sx={{ width: isMobile ? 28 : 36, height: isMobile ? 28 : 36 }}
-                >
-                  <PlaylistAddIcon sx={{ color: "#fff", fontSize: isMobile ? 20 : 24 }} />
-                </IconButton>
+                <PlaylistMenu
+                  track={track}
+                  playlists={playlists.filter(p => p.id !== selectedPlaylist?.id)}
+                  onAddToPlaylist={handleAddToPlaylist}
+                  onCreatePlaylist={handleCreatePlaylist}
+                />
 
-                {selectedPlaylist.id !== "liked" && (
+                {!selectedPlaylist.isLikedPlaylist && (
                   <IconButton
                     onClick={() => handleRemoveTrackFromPlaylist(selectedPlaylist.id, track.id)}
                     sx={{
@@ -384,52 +712,28 @@ export default function UserPlaylists({ setToast }) {
                     <DeleteIcon fontSize={isMobile ? "small" : "medium"} />
                   </IconButton>
                 )}
+
+                <TrackMenu
+                  track={track}
+                  onPlay={playTrack}
+                  onToggleLike={handleLike}
+                  onAddToQueue={(track) => addToQueue(track, setToast)}
+                  showPlayOption={false} // Can already click on track
+                  setToast={setToast}
+                />
               </Box>
             </Paper>
           ))}
-
-          <Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={handleClosePlaylistMenu}>
-            {playlists.map(pl => (
-              <MenuItem key={pl.id} onClick={() => handleAddToPlaylist(pl.id)}>{pl.name}</MenuItem>
-            ))}
-            <MenuItem onClick={() => setOpenCreateDialog(true)}>+ New playlist</MenuItem>
-          </Menu>
         </Box>
       )}
 
-      {/* Dialog création playlist */}
-      <Dialog
+      {/* Create Playlist Dialog */}
+      <CreatePlaylistDialog
         open={openCreateDialog}
         onClose={() => setOpenCreateDialog(false)}
-        PaperProps={{ sx: { bgcolor: "rgba(255,255,255,0.05)", color: "#fff" } }}
-      >
-        <DialogTitle sx={{ color: "#fff" }}>Create a new playlist</DialogTitle>
-        <DialogContent>
-          <TextField
-            autoFocus
-            margin="dense"
-            label="Playlist name"
-            fullWidth
-            variant="outlined"
-            value={newPlaylistName}
-            onChange={(e) => setNewPlaylistName(e.target.value)}
-            InputLabelProps={{ style: { color: "#999999ff" }, shrink: true }}
-            sx={{
-              input: { color: "#fff" },
-              mt: 1,
-              "& .MuiOutlinedInput-root": {
-                "& fieldset": { borderColor: "#fff" },
-                "&:hover fieldset": { borderColor: "#fff" },
-                "&.Mui-focused fieldset": { borderColor: "#fff" }
-              }
-            }}
-          />
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setOpenCreateDialog(false)} sx={{ color: "#fff" }}>Cancel</Button>
-          <Button onClick={handleCreatePlaylist} variant="contained" sx={{ bgcolor: "#1db954", "&:hover": { bgcolor: "#17a44b" } }}>Create</Button>
-        </DialogActions>
-      </Dialog>
+        onCreatePlaylist={handleCreatePlaylistWithName}
+        title="Create a new playlist"
+      />
     </Box>
   );
 }

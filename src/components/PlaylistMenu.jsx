@@ -1,0 +1,88 @@
+import React, { useState } from "react";
+import {
+  IconButton,
+  Menu,
+  MenuItem,
+  ListItemIcon,
+  ListItemText,
+} from "@mui/material";
+import PlaylistAddIcon from "@mui/icons-material/PlaylistAdd";
+import FavoriteIcon from "@mui/icons-material/Favorite";
+import FavoriteBorderIcon from "@mui/icons-material/FavoriteBorder";
+
+export default function PlaylistMenu({ 
+  track, 
+  playlists = [], 
+  onAddToPlaylist, 
+  onToggleLike, 
+  isLiked = false,
+  onCreatePlaylist
+}) {
+  const [anchorEl, setAnchorEl] = useState(null);
+  const open = Boolean(anchorEl);
+
+  const handleClick = (event) => {
+    event.stopPropagation();
+    setAnchorEl(event.currentTarget);
+  };
+
+  const handleClose = () => {
+    setAnchorEl(null);
+  };
+
+  const handleMenuAction = (action) => {
+    handleClose();
+    action();
+  };
+
+  return (
+    <>
+      <IconButton
+        onClick={handleClick}
+        sx={{ 
+          color: "rgba(255,255,255,0.7)",
+          "&:hover": { color: "#fff" }
+        }}
+        size="small"
+      >
+        <PlaylistAddIcon />
+      </IconButton>
+
+      <Menu
+        anchorEl={anchorEl}
+        open={open}
+        onClose={handleClose}
+        onClick={(e) => e.stopPropagation()}
+        PaperProps={{
+          sx: {
+            bgcolor: "#282828",
+            color: "#fff",
+            border: "1px solid rgba(255,255,255,0.1)",
+            "& .MuiMenuItem-root": {
+              "&:hover": {
+                bgcolor: "rgba(255,255,255,0.1)",
+              },
+            },
+          },
+        }}
+      >
+
+
+        {playlists.map((playlist) => (
+          <MenuItem
+            key={playlist.id}
+            onClick={() => handleMenuAction(() => onAddToPlaylist(playlist.id, track))}
+          >
+            <ListItemText primary={`Add to "${playlist.name}"`} />
+          </MenuItem>
+        ))}
+
+        {onCreatePlaylist && (
+          <MenuItem onClick={() => handleMenuAction(() => onCreatePlaylist(track))}>
+            <ListItemText primary="Create new playlist" />
+          </MenuItem>
+        )}
+      </Menu>
+    </>
+  );
+}

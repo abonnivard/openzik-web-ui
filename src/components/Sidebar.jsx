@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import {
   Drawer,
   List,
@@ -9,8 +9,9 @@ import {
   useTheme,
   useMediaQuery,
 } from "@mui/material";
-import { Home, Search, LibraryMusic, MenuBook, AccountCircle } from "@mui/icons-material";
+import { Home, Search, LibraryMusic, MenuBook, AccountCircle, AdminPanelSettings } from "@mui/icons-material";
 import { NavLink } from "react-router-dom";
+import { apiGetUserProfile } from "../api";
 import logo from "./../assets/OpenZik-logo.png";
 
 const navItems = [
@@ -23,6 +24,20 @@ const navItems = [
 export default function Sidebar() {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
+  const [userProfile, setUserProfile] = useState(null);
+
+  useEffect(() => {
+    const fetchUserProfile = async () => {
+      try {
+        const profile = await apiGetUserProfile();
+        setUserProfile(profile);
+      } catch (error) {
+        console.error("Error fetching user profile:", error);
+      }
+    };
+
+    fetchUserProfile();
+  }, []);
 
   if (isMobile) {
   return (
@@ -117,6 +132,23 @@ export default function Sidebar() {
 
       {/* Account en bas */}
       <Box sx={{ mt: "auto", mb: 2 }}>
+        {/* Administration (seulement pour les admins) */}
+        {userProfile?.is_admin && (
+          <ListItemButton
+            component={NavLink}
+            to="/administration"
+            sx={{
+              "&.active": { color: "#1DB954" },
+              "&:hover": { bgcolor: "rgba(255,255,255,0.05)" },
+            }}
+          >
+            <ListItemIcon sx={{ color: "inherit" }}>
+              <AdminPanelSettings />
+            </ListItemIcon>
+            <ListItemText primary="Administration" />
+          </ListItemButton>
+        )}
+        
         <ListItemButton
           component={NavLink}
           to="/account"

@@ -17,7 +17,7 @@ export default function TrackItem({ track, onDownload }) {
       }}
     >
       <Avatar
-        src={track.album.images?.[0]?.url || ""}
+        src={track.album?.images?.[0]?.url || ""}
         alt={track.name}
         variant="rounded"
         sx={{ width: 48, height: 48 }}
@@ -28,13 +28,13 @@ export default function TrackItem({ track, onDownload }) {
           {track.name}
         </Typography>
         <Typography noWrap sx={{ fontSize: "0.8rem", color: "rgba(255,255,255,0.7)" }}>
-          {track.artists.map((a) => a.name).join(", ")} — {track.album.name}
+          {track.artists?.map((a) => a.name).join(", ")} — {track.album?.name}
         </Typography>
       </Box>
 
       <IconButton
         onClick={() =>
-          onDownload(track.name, track.album.name, track.artists.map((a) => a.name).join(", "))
+          onDownload(track.name, track.album?.name, track.artists?.map((a) => a.name).join(", "))
         }
         sx={{ color: "#1db954" }}
       >

@@ -16,9 +16,11 @@ import {
 import { 
   PlayArrow, 
   Favorite, 
+  FavoriteBorder,
   PushPin,
   TrendingUp,
-  Person 
+  Person,
+  Delete
 } from "@mui/icons-material";
 import { 
   apiAddRecentlyPlayed, 
@@ -27,9 +29,16 @@ import {
   apiGetLikedTracks,
   apiGetTopTracks,
   apiGetRandomArtists,
-  apiGetPlaylistTracks
+  apiGetPlaylistTracks,
+  apiLikeTrack,
+  apiUnlikeTrack,
+  apiAddTrackToPlaylist,
+  apiRemoveTrackFromPlaylist,
+  apiCreatePlaylist,
 } from "../api";
-import { MarqueeText } from "./UserPlaylists";
+import TrackMenu from "../components/TrackMenu";
+import PlaylistMenu from "../components/PlaylistMenu";
+import CreatePlaylistDialog from "../components/CreatePlaylistDialog";
 import like from "../assets/like.png";
 
 async function playTrack(track) {
@@ -40,11 +49,27 @@ async function playTrack(track) {
   try {
     await apiAddRecentlyPlayed(track.id);
   } catch (err) {
-    console.error("Erreur ajout récemment joué :", err);
+    console.error("Error adding to recently played:", err);
   }
 }
 
-export default function Home() {
+// Function to add to queue
+function addToQueue(track, setToast) {
+  if (window.addToQueue) {
+    window.addToQueue(track);
+    if (setToast) {
+      setToast({ message: `"${track.title}" added to queue`, severity: "success" });
+    }
+    console.log(`Track added to queue: ${track.title}`);
+  } else {
+    console.warn("Player queue system not available");
+    if (setToast) {
+      setToast({ message: "Queue system not available", severity: "error" });
+    }
+  }
+}
+
+export default function Home({ setToast }) {
   const theme = useTheme();
   const navigate = useNavigate();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
@@ -54,11 +79,157 @@ export default function Home() {
   const [recentTracks, setRecentTracks] = useState([]);
   const [topTracks, setTopTracks] = useState([]);
   const [randomArtists, setRandomArtists] = useState([]);
+  const [allPlaylists, setAllPlaylists] = useState([]);
+  const [likedTracks, setLikedTracks] = useState([]);
   const [selectedPlaylist, setSelectedPlaylist] = useState(() => {
     const saved = sessionStorage.getItem("selectedPlaylist");
     return saved ? JSON.parse(saved) : null;
   });
   const [playlistTracks, setPlaylistTracks] = useState([]);
+  
+  // Create playlist dialog state
+  const [openCreateDialog, setOpenCreateDialog] = useState(false);
+  const [currentTrackForPlaylist, setCurrentTrackForPlaylist] = useState(null);
+
+  // Handle like/unlike tracks
+  const handleLike = async (track) => {
+    try {
+      if (likedTracks.includes(track.id)) {
+        await apiUnlikeTrack(track.id);
+        setLikedTracks(prev => prev.filter(id => id !== track.id));
+        if (setToast) {
+          setToast({ message: `"${track.title}" removed from favorites`, severity: "info" });
+        }
+      } else {
+        await apiLikeTrack(track.id);
+        setLikedTracks(prev => [...prev, track.id]);
+        if (setToast) {
+          setToast({ message: `"${track.title}" added to favorites`, severity: "success" });
+        }
+      }
+      // Dispatch event to notify other components
+      window.dispatchEvent(new CustomEvent('likedTracksChanged'));
+    } catch (error) {
+      console.error("Error toggling like:", error);
+      if (setToast) {
+        setToast({ message: "Error updating favorites", severity: "error" });
+      }
+    }
+  };
+
+  // Handle add to playlist
+  const handleAddToPlaylist = async (playlistId, track) => {
+    try {
+      // Check if track is already in the playlist
+      if (selectedPlaylist?.id === playlistId) {
+        const trackExists = playlistTracks.some(t => t.id === track.id);
+        if (trackExists) {
+          if (setToast) {
+            setToast({ message: `"${track.title}" is already in this playlist`, severity: "warning" });
+          }
+          return;
+        }
+      } else {
+        // If not currently viewing the playlist, fetch its tracks to check
+        try {
+          const currentPlaylistTracks = await apiGetPlaylistTracks(playlistId);
+          const trackExists = currentPlaylistTracks.some(t => t.id === track.id);
+          if (trackExists) {
+            const playlist = allPlaylists.find(p => p.id === playlistId);
+            if (setToast) {
+              setToast({ message: `"${track.title}" is already in "${playlist?.name}"`, severity: "warning" });
+            }
+            return;
+          }
+        } catch (checkError) {
+          console.error("Error checking playlist tracks:", checkError);
+        }
+      }
+
+      await apiAddTrackToPlaylist(playlistId, track.id);
+      const playlist = allPlaylists.find(p => p.id === playlistId);
+      
+      // If we're currently viewing this playlist, update its tracks immediately
+      if (selectedPlaylist?.id === playlistId) {
+        const updatedTracks = [...playlistTracks, track];
+        setPlaylistTracks(updatedTracks);
+        setSelectedPlaylist({ ...selectedPlaylist, tracks: updatedTracks });
+      }
+      
+      if (setToast) {
+        setToast({ message: `"${track.title}" added to "${playlist?.name}"`, severity: "success" });
+      }
+      // Dispatch event to notify other components
+      window.dispatchEvent(new CustomEvent('playlistsChanged'));
+    } catch (error) {
+      console.error("Error adding to playlist:", error);
+      if (setToast) {
+        setToast({ message: "Error adding to playlist", severity: "error" });
+      }
+    }
+  };
+
+  // Handle remove from playlist
+  const handleRemoveFromPlaylist = async (playlistId, track) => {
+    try {
+      await apiRemoveTrackFromPlaylist(playlistId, track.id);
+      const playlist = allPlaylists.find(p => p.id === playlistId);
+      
+      // If we're currently viewing this playlist, update its tracks immediately
+      if (selectedPlaylist?.id === playlistId) {
+        const updatedTracks = playlistTracks.filter(t => t.id !== track.id);
+        setPlaylistTracks(updatedTracks);
+        setSelectedPlaylist({ ...selectedPlaylist, tracks: updatedTracks });
+      }
+      
+      if (setToast) {
+        setToast({ message: `"${track.title}" removed from "${playlist?.name}"`, severity: "success" });
+      }
+      // Dispatch event to notify other components
+      window.dispatchEvent(new CustomEvent('playlistsChanged'));
+    } catch (error) {
+      console.error("Error removing from playlist:", error);
+      if (setToast) {
+        setToast({ message: "Error removing from playlist", severity: "error" });
+      }
+    }
+  };
+
+  // Handle create new playlist (called from PlaylistMenu)
+  const handleCreatePlaylist = (track) => {
+    setCurrentTrackForPlaylist(track);
+    setOpenCreateDialog(true);
+  };
+
+  // Handle actual playlist creation with name
+  const handleCreatePlaylistWithName = async (playlistName) => {
+    try {
+      const newPlaylist = await apiCreatePlaylist(playlistName);
+      
+      // If there's a track to add, add it to the new playlist
+      if (currentTrackForPlaylist) {
+        await apiAddTrackToPlaylist(newPlaylist.id, currentTrackForPlaylist.id);
+        if (setToast) {
+          setToast({ message: `"${currentTrackForPlaylist.title}" added to "${playlistName}"`, severity: "success" });
+        }
+      } else {
+        if (setToast) {
+          setToast({ message: `Playlist "${playlistName}" created`, severity: "success" });
+        }
+      }
+      
+      setAllPlaylists(prev => [...prev, newPlaylist]);
+      setCurrentTrackForPlaylist(null);
+      
+      // Dispatch event to notify other components
+      window.dispatchEvent(new CustomEvent('playlistsChanged'));
+    } catch (error) {
+      console.error("Error creating playlist:", error);
+      if (setToast) {
+        setToast({ message: "Error creating playlist", severity: "error" });
+      }
+    }
+  };
 
   useEffect(() => {
     const fetchData = async () => {
@@ -78,19 +249,24 @@ export default function Home() {
           apiGetRandomArtists(5)
         ]);
 
-        // Récemment écoutés - distincts par track ID (on en veut au moins 6)
+        // Recently played - distinct by track ID (we want at least 6)
         const formattedRecent = recentData.map(t => ({
           ...t,
           url: `http://localhost:3000/${t.file_path.split(/[\\/]/).map(encodeURIComponent).join("/")}`
         }));
-        console.log(`Tracks récents trouvés: ${formattedRecent.length}`, formattedRecent);
         
-        // Garder seulement les tracks distincts (par ID), limite à 6 pour l'affichage
+        // Keep only distinct tracks (by ID), limit to 6 for display
         const uniqueRecent = formattedRecent.filter((track, index, self) => 
           index === self.findIndex(t => t.id === track.id)
         ).slice(0, 6);
         
         setRecentTracks(uniqueRecent);
+
+        // Store all playlists for the playlist menu
+        setAllPlaylists(playlistsData);
+        
+        // Store liked track IDs
+        setLikedTracks(likedData.map(t => t.id));
 
         // Récupérer les tracks pour chaque playlist pinnée
         const pinnedPlaylists = playlistsData.filter(p => p.is_pinned);
@@ -114,7 +290,7 @@ export default function Home() {
         
         // Créer une playlist "Liked Songs" virtuelle
         const likedPlaylist = {
-          id: 'liked-songs',
+          id: 'liked',
           name: 'Liked Songs',
           tracks: likedData.map(t => ({
             ...t,
@@ -141,6 +317,74 @@ export default function Home() {
     };
     fetchData();
   }, []);
+
+  // Update liked songs playlist when likedTracks changes
+  useEffect(() => {
+    const updateLikedSongsPlaylist = async () => {
+      if (likedTracks.length > 0) {
+        try {
+          const likedData = await apiGetLikedTracks();
+          const formattedLiked = likedData.map(t => ({
+            ...t,
+            url: `http://localhost:3000/${t.file_path.split(/[\\/]/).map(encodeURIComponent).join("/")}`
+          }));
+
+          // Update the liked playlist in the playlists array
+          setPlaylists(prevPlaylists => {
+            const updatedPlaylists = [...prevPlaylists];
+            const likedPlaylistIndex = updatedPlaylists.findIndex(p => p.isLikedPlaylist);
+            if (likedPlaylistIndex !== -1) {
+              updatedPlaylists[likedPlaylistIndex] = {
+                ...updatedPlaylists[likedPlaylistIndex],
+                tracks: formattedLiked,
+                image: formattedLiked[0]?.image || null
+              };
+            }
+            return updatedPlaylists;
+          });
+
+          // If currently viewing liked songs playlist, update its tracks
+          if (selectedPlaylist?.isLikedPlaylist) {
+            setPlaylistTracks(formattedLiked);
+            const updatedSelectedPlaylist = {
+              ...selectedPlaylist,
+              tracks: formattedLiked
+            };
+            setSelectedPlaylist(updatedSelectedPlaylist);
+            sessionStorage.setItem("selectedPlaylist", JSON.stringify(updatedSelectedPlaylist));
+          }
+        } catch (error) {
+          console.error('Error updating liked songs:', error);
+        }
+      } else {
+        // If no liked tracks, update with empty array
+        setPlaylists(prevPlaylists => {
+          const updatedPlaylists = [...prevPlaylists];
+          const likedPlaylistIndex = updatedPlaylists.findIndex(p => p.isLikedPlaylist);
+          if (likedPlaylistIndex !== -1) {
+            updatedPlaylists[likedPlaylistIndex] = {
+              ...updatedPlaylists[likedPlaylistIndex],
+              tracks: [],
+              image: null
+            };
+          }
+          return updatedPlaylists;
+        });
+
+        if (selectedPlaylist?.isLikedPlaylist) {
+          setPlaylistTracks([]);
+          const updatedSelectedPlaylist = {
+            ...selectedPlaylist,
+            tracks: []
+          };
+          setSelectedPlaylist(updatedSelectedPlaylist);
+          sessionStorage.setItem("selectedPlaylist", JSON.stringify(updatedSelectedPlaylist));
+        }
+      }
+    };
+
+    updateLikedSongsPlaylist();
+  }, [likedTracks, selectedPlaylist?.isLikedPlaylist]);
 
   // Recharger les tracks de la playlist sélectionnée si elle existe dans sessionStorage
   useEffect(() => {
@@ -235,8 +479,54 @@ export default function Home() {
     }
   }, [selectedPlaylist]);
 
+  // Listen for playlist changes from other components
+  useEffect(() => {
+    const handlePlaylistsChanged = () => {
+      console.log('Playlists changed event received in Home');
+      const fetchData = async () => {
+        try {
+          const [playlistsData, recentData, topData, artistsData, allPlaylistsData, likedData] = await Promise.all([
+            apiGetPlaylists(),
+            apiAddRecentlyPlayed(),
+            apiGetTopTracks(),
+            apiGetRandomArtists(),
+            apiGetPlaylists(),
+            apiGetLikedTracks()
+          ]);
+
+          setPlaylists(playlistsData);
+          setAllPlaylists(allPlaylistsData);
+          
+          // Reload playlist tracks if we're viewing a playlist
+          if (selectedPlaylist && selectedPlaylist.id !== "liked") {
+            try {
+              const playlistTracksData = await apiGetPlaylistTracks(selectedPlaylist.id);
+              const formattedTracks = playlistTracksData.map(t => ({
+                ...t,
+                url: `http://localhost:3000/${t.file_path.split(/[\\/]/).map(encodeURIComponent).join("/")}`
+              }));
+              setPlaylistTracks(formattedTracks);
+              setSelectedPlaylist(prev => ({ ...prev, tracks: formattedTracks }));
+            } catch (error) {
+              console.error(`Error loading tracks for playlist ${selectedPlaylist.id}:`, error);
+            }
+          }
+        } catch (error) {
+          console.error("Error fetching data:", error);
+        }
+      };
+      fetchData();
+    };
+
+    window.addEventListener('playlistsChanged', handlePlaylistsChanged);
+
+    return () => {
+      window.removeEventListener('playlistsChanged', handlePlaylistsChanged);
+    };
+  }, [selectedPlaylist]);
+
   return (
-    <Box sx={{ display: "flex", flexDirection: "column", gap: 4, pb: 10 }}>
+    <Box sx={{ display: "flex", flexDirection: "column", gap: 4, pb: 12 }} >
       {/* Vue Playlist détaillée */}
       {selectedPlaylist ? (
         <Box>
@@ -251,7 +541,7 @@ export default function Home() {
             <Box sx={{ display: "flex", alignItems: "center", gap: 2, mb: 2 }}>
               <Avatar
                 variant="rounded"
-                src={selectedPlaylist.isLikedPlaylist ? like : (playlistTracks[0]?.image || like)}
+                src={selectedPlaylist.isLikedPlaylist ? like : (selectedPlaylist.custom_image || playlistTracks[0]?.image || like)}
                 sx={{ 
                   width: isMobile ? 80 : 120, 
                   height: isMobile ? 80 : 120,
@@ -348,21 +638,65 @@ export default function Home() {
                     {track.artist}
                   </Typography>
                 </Box>
-                <IconButton 
-                  sx={{ color: "#1db954" }}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handlePlayTrack(track);
-                  }}
-                >
-                  <PlayArrow />
-                </IconButton>
+                <Box sx={{ display: "flex", alignItems: "center" }}>
+                  <PlaylistMenu
+                    track={track}
+                    playlists={allPlaylists.filter(p => p.id !== 'liked')}
+                    onAddToPlaylist={handleAddToPlaylist}
+                    onToggleLike={handleLike}
+                    isLiked={likedTracks.includes(track.id)}
+                    onCreatePlaylist={handleCreatePlaylist}
+                  />
+                  {/* Action button - Heart for liked playlist, Delete for regular playlists */}
+                  {selectedPlaylist.id === "liked" ? (
+                    <IconButton
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleLike(track);
+                      }}
+                      sx={{ 
+                        color: likedTracks.includes(track.id) ? "#1db954" : "rgba(255,255,255,0.6)",
+                        "&:hover": { 
+                          color: likedTracks.includes(track.id) ? "#ff6b6b" : "#1db954",
+                          bgcolor: likedTracks.includes(track.id) ? "rgba(255,107,107,0.1)" : "rgba(29,185,84,0.1)"
+                        }
+                      }}
+                      size="small"
+                    >
+                      {likedTracks.includes(track.id) ? <Favorite fontSize="small" /> : <FavoriteBorder fontSize="small" />}
+                    </IconButton>
+                  ) : (
+                    <IconButton
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleRemoveFromPlaylist(selectedPlaylist.id, track);
+                      }}
+                      sx={{ 
+                        color: "rgba(255,255,255,0.6)",
+                        "&:hover": { 
+                          color: "#ff6b6b",
+                          bgcolor: "rgba(255,107,107,0.1)"
+                        }
+                      }}
+                      size="small"
+                    >
+                      <Delete fontSize="small" />
+                    </IconButton>
+                  )}
+                  <TrackMenu
+                    track={track}
+                    onPlay={handlePlayTrack}
+                    onAddToQueue={(track) => addToQueue(track, setToast)}
+                    showPlayOption={false} // Can already click on track
+                    setToast={setToast}
+                  />
+                </Box>
               </Paper>
             ))}
           </Box>
         </Box>
       ) : (
-        /* Vue Home normale */
+        /* Normal Home view */
         <>
           {/* Header */}
           <Box>
@@ -393,7 +727,7 @@ export default function Home() {
             mb: 2,
             fontSize: isMobile ? "1.1rem" : "1.25rem"
           }}>
-            🎵 Recently Played ({recentTracks.length})
+            🎵 Recently Played
           </Typography>
           <Box sx={{
             display: "grid",
@@ -472,7 +806,7 @@ export default function Home() {
         </Box>
       )}
 
-      {/* Section Playlists unifiée - Liked Songs + Pinned Playlists */}
+      {/* Unified Playlists Section - Liked Songs + Pinned Playlists */}
       {playlists.length > 0 && (
         <Box>
           <Box sx={{ display: "flex", alignItems: "center", mb: 2 }}>
@@ -530,7 +864,7 @@ export default function Home() {
                     src={
                       playlist.isLikedPlaylist 
                         ? like
-                        : (playlist.tracks?.[0]?.image)
+                        : (playlist.custom_image || playlist.tracks?.[0]?.image)
                     }
                     sx={{ 
                       width: "100%", 
@@ -663,14 +997,13 @@ export default function Home() {
                 }}>
                   {track.play_count} plays
                 </Typography>
-                <IconButton 
-                  sx={{ color: "#1db954" }}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handlePlayTrack(track);
-                  }}
-                >
-                </IconButton>
+                <TrackMenu
+                  track={track}
+                  onPlay={handlePlayTrack}
+                  onAddToQueue={(track) => addToQueue(track, setToast)}
+                  showPlayOption={false} // Can already click on track
+                  setToast={setToast}
+                />
               </Paper>
             ))}
           </Box>
@@ -746,6 +1079,17 @@ export default function Home() {
       )}
         </>
       )}
+      
+      {/* Create Playlist Dialog */}
+      <CreatePlaylistDialog
+        open={openCreateDialog}
+        onClose={() => {
+          setOpenCreateDialog(false);
+          setCurrentTrackForPlaylist(null);
+        }}
+        onCreatePlaylist={handleCreatePlaylistWithName}
+        defaultName={currentTrackForPlaylist ? `My Playlist ${Date.now()}` : ""}
+      />
     </Box>
   );
 }

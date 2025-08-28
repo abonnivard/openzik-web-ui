@@ -5,18 +5,13 @@ import {
   Avatar,
   TextField,
   Paper,
-  IconButton,
-  Menu,
-  MenuItem,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  Button
+  IconButton
 } from "@mui/material";
 import FavoriteIcon from "@mui/icons-material/Favorite";
 import FavoriteBorderIcon from "@mui/icons-material/FavoriteBorder";
-import PlaylistAddIcon from "@mui/icons-material/PlaylistAdd";
+import TrackMenu from "../components/TrackMenu";
+import PlaylistMenu from "../components/PlaylistMenu";
+import CreatePlaylistDialog from "../components/CreatePlaylistDialog";
 import {
   apiGetLibrary,
   apiGetPlaylists,
@@ -37,7 +32,23 @@ async function playTrack(track) {
   try {
     await apiAddRecentlyPlayed(track.id);
   } catch (err) {
-    console.error("Erreur ajout récemment joué :", err);
+    console.error("Error adding to recently played:", err);
+  }
+}
+
+// Function to add to queue
+function addToQueue(track, setToast) {
+  if (window.addToQueue) {
+    window.addToQueue(track);
+    if (setToast) {
+      setToast({ message: `"${track.title}" added to queue`, severity: "success" });
+    }
+    console.log(`Track added to queue: ${track.title}`);
+  } else {
+    console.warn("Player queue system not available");
+    if (setToast) {
+      setToast({ message: "Queue system not available", severity: "error" });
+    }
   }
 }
 
@@ -84,12 +95,9 @@ export default function Library({ setToast }) {
 
   const [likedTracks, setLikedTracks] = useState([]);
   const [playlists, setPlaylists] = useState([]);
-  const [anchorEl, setAnchorEl] = useState(null);
-  const [currentTrackForPlaylist, setCurrentTrackForPlaylist] = useState(null);
 
   // Dialog création playlist
   const [openCreateDialog, setOpenCreateDialog] = useState(false);
-  const [newPlaylistName, setNewPlaylistName] = useState("");
 
   // Charger bibliothèque
   useEffect(() => {
@@ -128,8 +136,26 @@ export default function Library({ setToast }) {
     fetchUserData();
   }, []);
 
+  // Listen for liked tracks changes from other components
+  useEffect(() => {
+    const handleLikedTracksChanged = async () => {
+      try {
+        const liked = await apiGetLikedTracks();
+        setLikedTracks(liked.map(t => t.id));
+      } catch (error) {
+        console.error("Error updating liked tracks:", error);
+      }
+    };
+
+    window.addEventListener('likedTracksChanged', handleLikedTracksChanged);
+    return () => {
+      window.removeEventListener('likedTracksChanged', handleLikedTracksChanged);
+    };
+  }, []);
+
   // Like / Unlike
-  const handleLike = async (trackId) => {
+  const handleLike = async (track) => {
+    const trackId = typeof track === 'object' ? track.id : track;
     try {
       if (likedTracks.includes(trackId)) {
         await apiUnlikeTrack(trackId);
@@ -138,45 +164,47 @@ export default function Library({ setToast }) {
         await apiLikeTrack(trackId);
         setLikedTracks([...likedTracks, trackId]);
       }
+      // Dispatch event to notify other components
+      window.dispatchEvent(new CustomEvent('likedTracksChanged'));
     } catch (e) {
-      console.error("Erreur like/unlike", e);
+      console.error("Error like/unlike", e);
     }
   };
 
-  // Ajouter un track à une playlist
-  const handleAddToPlaylist = async (playlistId) => {
-    if (!currentTrackForPlaylist) return;
+  // Handle add to playlist
+  const handleAddToPlaylist = async (playlistId, track) => {
     try {
-      await apiAddTrackToPlaylist(playlistId, currentTrackForPlaylist.id);
-      handleClosePlaylistMenu();
-      setToast({ message: `Track ajouté à la playlist !`, severity: "success" });
-    } catch (e) {
-      console.error("Erreur ajout track à playlist", e);
+      // Check if track is already in the playlist
+      const trackExists = false; // Could check here if needed
+      if (trackExists) {
+        setToast({ message: `"${track.title}" is already in this playlist`, severity: "warning" });
+        return;
+      }
+
+      await apiAddTrackToPlaylist(playlistId, track.id);
+      const playlist = playlists.find(p => p.id === playlistId);
+      setToast({ message: `"${track.title}" added to "${playlist?.name}"`, severity: "success" });
+    } catch (error) {
+      console.error("Error adding to playlist:", error);
+      setToast({ message: "Error adding to playlist", severity: "error" });
     }
   };
 
-  // Créer une nouvelle playlist via Dialog
-  const handleCreatePlaylist = async () => {
-    if (!newPlaylistName) return;
+  // Handle create new playlist (called from PlaylistMenu)
+  const handleCreatePlaylist = (track) => {
+    setOpenCreateDialog(true);
+  };
+
+  // Handle actual playlist creation with name
+  const handleCreatePlaylistWithName = async (playlistName) => {
     try {
-      const newPlaylist = await apiCreatePlaylist(newPlaylistName);
+      const newPlaylist = await apiCreatePlaylist(playlistName);
       setPlaylists([...playlists, newPlaylist]);
-      setToast({ message: `Playlist créée : ${newPlaylistName}`, severity: "success" });
-      setNewPlaylistName("");
+      setToast({ message: `Playlist "${playlistName}" created`, severity: "success" });
       setOpenCreateDialog(false);
     } catch (e) {
       setToast({ message: "Erreur création playlist", severity: "error" });
     }
-  };
-
-  const handleOpenPlaylistMenu = (event, track) => {
-    setAnchorEl(event.currentTarget);
-    setCurrentTrackForPlaylist(track);
-  };
-
-  const handleClosePlaylistMenu = () => {
-    setAnchorEl(null);
-    setCurrentTrackForPlaylist(null);
   };
 
   // Sauvegarde des filtres
@@ -345,86 +373,81 @@ export default function Library({ setToast }) {
                 bgcolor: "rgba(255,255,255,0.05)",
                 borderRadius: 1,
                 "&:hover": { bgcolor: "rgba(29,219,84,0.1)" },
+                minHeight: 64,
               }}
             >
-              <Box sx={{ display: "flex", alignItems: "center", gap: 2 }} onClick={() => playTrack(track)}>
+              <Box 
+                sx={{ 
+                  display: "flex", 
+                  alignItems: "center", 
+                  gap: 2, 
+                  flex: 1, 
+                  minWidth: 0,
+                  cursor: "pointer" 
+                }} 
+                onClick={() => playTrack(track)}
+              >
                 <Avatar
                   variant="rounded"
                   src={track.image || ""}
                   alt={track.title || "Track"}
-                  sx={{ width: 48, height: 48 }}
+                  sx={{ width: 48, height: 48, flexShrink: 0 }}
                 />
-                <Box sx={{ overflow: "hidden", minWidth: 0 }}>
-                  <MarqueeText text={track.title || "Unknown Title"} />
-                  <Typography sx={{ color: "rgba(255,255,255,0.7)", fontSize: "0.8rem" }}>
+                <Box sx={{ overflow: "hidden", minWidth: 0, flex: 1 }}>
+                  <Typography sx={{ 
+                    color: "#fff", 
+                    fontWeight: 600,
+                    whiteSpace: "nowrap",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis"
+                  }}>
+                    {track.title || "Unknown Title"}
+                  </Typography>
+                  <Typography sx={{ 
+                    color: "rgba(255,255,255,0.7)", 
+                    fontSize: "0.8rem",
+                    whiteSpace: "nowrap",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis"
+                  }}>
                     {track.artist || "Unknown Artist"}
                   </Typography>
                 </Box>
               </Box>
 
               {/* Boutons like + playlist */}
-              <Box>
+              <Box sx={{ display: "flex", alignItems: "center" }}>
                 <IconButton onClick={() => handleLike(track.id)} sx={{ color: likedTracks.includes(track.id) ? "#1db954" : "#fff" }}>
                   {likedTracks.includes(track.id) ? <FavoriteIcon /> : <FavoriteBorderIcon />}
                 </IconButton>
-                <IconButton onClick={(e) => handleOpenPlaylistMenu(e, track)}>
-                  <PlaylistAddIcon sx={{ color: "#fff" }} />
-                </IconButton>
+                <PlaylistMenu
+                  track={track}
+                  playlists={playlists.filter(p => p.id !== 'liked-songs')}
+                  onAddToPlaylist={handleAddToPlaylist}
+                  onToggleLike={handleLike}
+                  isLiked={likedTracks.includes(track.id)}
+                  onCreatePlaylist={handleCreatePlaylist}
+                />
+                <TrackMenu
+                  track={track}
+                  onPlay={playTrack}
+                  onAddToQueue={(track) => addToQueue(track, setToast)}
+                  showPlayOption={false} // Can already click on track
+                  setToast={setToast}
+                />
               </Box>
             </Paper>
           ))}
-
-          <Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={handleClosePlaylistMenu}>
-            {playlists.map(pl => (
-              <MenuItem key={pl.id} onClick={() => handleAddToPlaylist(pl.id)}>{pl.name}</MenuItem>
-            ))}
-            <MenuItem onClick={() => setOpenCreateDialog(true)}>+ New playlist</MenuItem>
-          </Menu>
         </Box>
       )}
 
-      {/* Dialog création playlist */}
-       <Dialog
-              open={openCreateDialog}
-              onClose={() => setOpenCreateDialog(false)}
-              PaperProps={{ sx: { bgcolor: "rgba(255,255,255,0.05)", color: "#fff" } }}
-            >
-              <DialogTitle sx={{ color: "#fff" }}>Create a new playlist</DialogTitle>
-              <DialogContent>
-                <TextField
-                  autoFocus
-                  margin="dense"
-                  label="Playlist name"
-                  fullWidth
-                  variant="outlined"
-                  value={newPlaylistName}
-                  onChange={(e) => setNewPlaylistName(e.target.value)}
-                  InputLabelProps={{ 
-                    style: { color: "#999999ff" }, 
-                    shrink: true // fait rester le label en haut même sans focus
-                  }}
-                  sx={{ 
-                    input: { color: "#fff" }, 
-                    mt: 1,
-                    "& .MuiOutlinedInput-root": {
-                      "& fieldset": {
-                        borderColor: "#fff" // contour blanc
-                      },
-                      "&:hover fieldset": {
-                        borderColor: "#fff"
-                      },
-                      "&.Mui-focused fieldset": {
-                        borderColor: "#fff"
-                      }
-                    }
-                  }}
-                />
-              </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setOpenCreateDialog(false)} sx={{ color: "#fff" }}>Annuler</Button>
-          <Button onClick={handleCreatePlaylist} sx={{ color: "#1db954" }}>Créer</Button>
-        </DialogActions>
-      </Dialog>
+      {/* Create Playlist Dialog */}
+      <CreatePlaylistDialog
+        open={openCreateDialog}
+        onClose={() => setOpenCreateDialog(false)}
+        onCreatePlaylist={handleCreatePlaylistWithName}
+        title="Create a new playlist"
+      />
     </Box>
   );
 }

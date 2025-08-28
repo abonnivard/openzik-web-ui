@@ -33,10 +33,11 @@ export default function ArtistItem({ artist }) {
 
       <IconButton
         component="a"
-        href={artist.external_urls.spotify}
+        href={artist.external_urls?.spotify}
         target="_blank"
         rel="noopener noreferrer"
         sx={{ color: "#1db954" }}
+        disabled={!artist.external_urls?.spotify}
       >
         <OpenInNewIcon />
       </IconButton>

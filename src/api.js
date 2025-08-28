@@ -7,6 +7,22 @@ async function requestWithToken(path, options = {}) {
   if (token) headers.Authorization = `Bearer ${token}`;
 
   const res = await fetch(`${BASE}${path}`, { ...options, headers });
+  
+  // Vérifier si le token a expiré (401 Unauthorized)
+  if (res.status === 401) {
+    // Déclencher l'événement d'expiration du token
+    window.dispatchEvent(new CustomEvent('token-expired'));
+    
+    // Fallback: redirection directe si l'événement ne fonctionne pas
+    setTimeout(() => {
+      if (window.location.pathname !== '/login') {
+        window.location.href = "/login";
+      }
+    }, 100);
+    
+    throw new Error("Session expired. Please log in again.");
+  }
+  
   if (!res.ok) {
     const errText = await res.text();
     throw new Error(errText || "API Error");
@@ -44,6 +60,19 @@ export function apiChangePassword(username, newPassword, oldPassword) {
 // Recherche multi-types
 export function apiSearch(q) {
   return requestWithToken(`/search?q=${encodeURIComponent(q)}`);
+}
+
+// Recherche dans la bibliothèque locale
+export function apiSearchLocal(q) {
+  return requestWithToken(`/library/search?q=${encodeURIComponent(q)}`);
+}
+
+// Match Spotify results with local content
+export function apiMatchWithLocal(spotifyResults) {
+  return requestWithToken("/library/match", {
+    method: "POST",
+    body: JSON.stringify({ spotifyResults }),
+  });
 }
 
 // Download album
@@ -132,6 +161,37 @@ requestWithToken("/music/track-played", {
   body: JSON.stringify({ trackId }),
 });
 
+// === ADMIN API ===
+
+// Récupérer tous les utilisateurs (admin seulement)
+export const apiGetAllUsers = () => requestWithToken("/admin/users");
+
+// Créer un nouvel utilisateur (admin seulement)
+export const apiCreateUser = (userData) =>
+  requestWithToken("/admin/users", {
+    method: "POST",
+    body: JSON.stringify(userData),
+  });
+
+// Modifier un utilisateur (admin seulement)
+export const apiUpdateUser = (userId, userData) =>
+  requestWithToken(`/admin/users/${userId}`, {
+    method: "PUT",
+    body: JSON.stringify(userData),
+  });
+
+// Supprimer un utilisateur (admin seulement)
+export const apiDeleteUser = (userId) =>
+  requestWithToken(`/admin/users/${userId}`, {
+    method: "DELETE",
+  });
+
+// Récupérer les statistiques générales (admin seulement)
+export const apiGetAdminStats = () => requestWithToken("/admin/stats");
+
+// Récupérer le profil de l'utilisateur connecté
+export const apiGetUserProfile = () => requestWithToken("/me");
+
 // Récupérer les titres récemment joués
 export const apiGetRecentlyPlayed = () =>
   requestWithToken("/home/recently-played");
@@ -147,3 +207,31 @@ export const apiGetRandomArtists = (limit = 5) =>
 // Récupérer les statistiques générales de l'utilisateur
 export const apiGetUserStats = () =>
   requestWithToken("/stats/user-stats");
+
+// === Fonctions pour les images ===
+
+// Upload image de profil (base64)
+export const apiUploadProfileImage = (imageData) =>
+  requestWithToken("/uploads/profile-image", {
+    method: "POST",
+    body: JSON.stringify({ imageData }),
+  });
+
+// Upload image de playlist (base64)
+export const apiUploadPlaylistImage = (playlistId, imageData) =>
+  requestWithToken(`/uploads/playlist-image/${playlistId}`, {
+    method: "POST",
+    body: JSON.stringify({ imageData }),
+  });
+
+// Supprimer image de profil
+export const apiRemoveProfileImage = () =>
+  requestWithToken("/uploads/profile-image", {
+    method: "DELETE",
+  });
+
+// Supprimer image de playlist
+export const apiRemovePlaylistImage = (playlistId) =>
+  requestWithToken(`/uploads/playlist-image/${playlistId}`, {
+    method: "DELETE",
+  });

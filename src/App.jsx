@@ -1,16 +1,20 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Routes, Route, Navigate, NavLink } from "react-router-dom";
 import { Box, CssBaseline, Snackbar, Alert, Slide, useTheme, useMediaQuery } from "@mui/material";
-import { AccountCircle } from "@mui/icons-material";
+import { AccountCircle, AdminPanelSettings } from "@mui/icons-material";
 import Sidebar from "./components/Sidebar";
 import Player from "./components/Player";
 import Home from "./pages/Home";
 import Search from "./pages/Search";
 import Library from "./pages/Library";
 import Account from "./pages/Account";
+import Administration from "./pages/Administration";
 import Login from "./pages/Login";
 import PrivateRoute from "./components/PrivateRoute";
+import AdminRoute from "./components/AdminRoute";
 import Playlists from "./pages/UserPlaylists";
+import { useTokenExpiration } from "./hooks/useTokenExpiration";
+import { apiGetUserProfile } from "./api";
 import logo from "./assets/OpenZik-logo.png";
 
 function SlideTransition(props) {
@@ -21,6 +25,27 @@ export default function App() {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
   const [toast, setToast] = useState({ message: "", severity: "info" });
+  const [userProfile, setUserProfile] = useState(null);
+
+  // Utiliser le hook d'expiration de token
+  useTokenExpiration();
+
+  // Récupérer le profil utilisateur
+  useEffect(() => {
+    const fetchUserProfile = async () => {
+      try {
+        const token = sessionStorage.getItem("token");
+        if (token) {
+          const profile = await apiGetUserProfile();
+          setUserProfile(profile);
+        }
+      } catch (error) {
+        console.error("Error fetching user profile:", error);
+      }
+    };
+
+    fetchUserProfile();
+  }, []);
 
   const handleLogin = () => {
     window.location.href = "/";
@@ -85,9 +110,19 @@ export default function App() {
                     <NavLink to="/">
                       <Box component="img" src={logo} alt="OpenZik logo" sx={{ height: 40, mt: 1 }} />
                     </NavLink>
-                    <NavLink to="/account">
-                      <AccountCircle sx={{ fontSize: 30, color: "#fff", mt: 1 }} />
-                    </NavLink>
+                    
+                    <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+                      {/* Bouton Administration (seulement pour les admins) */}
+                      {userProfile?.is_admin && (
+                        <NavLink to="/administration">
+                          <AdminPanelSettings sx={{ fontSize: 30, color: "#fff", mt: 1 }} />
+                        </NavLink>
+                      )}
+                      
+                      <NavLink to="/account">
+                        <AccountCircle sx={{ fontSize: 30, color: "#fff", mt: 1 }} />
+                      </NavLink>
+                    </Box>
                   </Box>
                 )}
 
@@ -110,6 +145,13 @@ export default function App() {
                     <Route path="/library" element={<PrivateRoute><Library setToast={setToast} /></PrivateRoute>} />
                     <Route path="/playlists" element={<PrivateRoute><Playlists setToast={setToast} /></PrivateRoute>} />
                     <Route path="/account" element={<PrivateRoute><Account setToast={setToast} /></PrivateRoute>} />
+                    <Route path="/administration" element={
+                      <PrivateRoute>
+                        <AdminRoute>
+                          <Administration setToast={setToast} />
+                        </AdminRoute>
+                      </PrivateRoute>
+                    } />
                     <Route path="*" element={<Navigate to="/" replace />} />
                   </Routes>
                 </Box>

@@ -1,9 +1,9 @@
-import React, { useState, useEffect } from "react";
-import { CircularProgress, Box, Typography, TextField } from "@mui/material";
+import React, { useEffect, useState } from "react";
+import { Box, Typography, TextField, CircularProgress } from "@mui/material";
+import TrackList from "../components/TrackList";
 import ArtistList from "../components/ArtistList";
 import AlbumList from "../components/AlbumList";
-import TrackList from "../components/TrackList";
-import { apiSearch, apiDownload } from "../api";
+import { apiSearch, apiSearchLocal, apiMatchWithLocal, apiAddRecentlyPlayed, apiDownload } from "../api";
 
 export default function Search({ setToast }) {
   const [query, setQuery] = useState(() => sessionStorage.getItem("searchQuery") || "");
@@ -12,10 +12,23 @@ export default function Search({ setToast }) {
     const saved = sessionStorage.getItem("searchResults");
     return saved
       ? JSON.parse(saved)
-      : { artists: [], albums: [], tracks: [], playlists: [], users: [] };
+      : { artists: [], albums: [], tracks: []};
   });
 
-  const handleSearch = async () => {
+  // Function to play a track directly
+  const handlePlayTrack = async (track) => {
+    sessionStorage.setItem("currentTrack", JSON.stringify(track));
+    sessionStorage.setItem("isPlaying", JSON.stringify(true));
+    window.dispatchEvent(new Event("storage"));
+
+    try {
+      await apiAddRecentlyPlayed(track.id);
+    } catch (err) {
+      console.error("Error adding to recently played:", err);
+    }
+  };
+
+const handleSearch = async () => {
     if (!query) return;
     setLoading(true);
     try {
@@ -24,15 +37,12 @@ export default function Search({ setToast }) {
         artists: res.artists || [],
         albums: res.albums || [],
         tracks: res.tracks || [],
-        playlists: res.playlists || [],
-        users: res.users || [],
       });
       sessionStorage.setItem("searchQuery", query);
       sessionStorage.setItem("searchResults", JSON.stringify(res));
-      setToast({ message: "Recherche terminée ✅", severity: "success" });
     } catch (e) {
       console.error(e);
-      setToast({ message: "Erreur lors de la recherche ❌", severity: "error" });
+      setToast({ message: "Error during search ❌", severity: "error" });
     }
     setLoading(false);
   };
@@ -40,12 +50,13 @@ export default function Search({ setToast }) {
   const handleDownload = async (album) => {
     try {
       await apiDownload(album);
-      setToast({ message: "Téléchargement lancé ✅", severity: "success" });
+      setToast({ message: "Download launched ✅", severity: "success" });
     } catch (e) {
       console.error(e);
-      setToast({ message: "Erreur lors du téléchargement ❌", severity: "error" });
+      setToast({ message: "Error during download ❌", severity: "error" });
     }
   };
+
 
   useEffect(() => {
     if (query && Object.values(data).every((arr) => arr.length === 0)) {
@@ -92,10 +103,24 @@ export default function Search({ setToast }) {
       {loading ? (
         <CircularProgress sx={{ color: "#1db954", alignSelf: "center", mt: 3 }} />
       ) : (
-        <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
-          <ArtistList artists={data.artists} />
-          <AlbumList albums={data.albums} onDownload={handleDownload} />
-          <TrackList tracks={data.tracks} onDownload={handleDownload} />
+        <Box sx={{ display: "flex", flexDirection: "column", gap: 3 }}>
+            <Box>
+              <ArtistList artists={data.artists} />
+            </Box>
+
+            <Box>
+              <AlbumList 
+                albums={data.albums} 
+                onDownload={handleDownload}
+                setToast={setToast}
+              />
+            </Box>
+            <Box>
+              <TrackList
+                tracks={data.tracks}
+                setToast={setToast}
+              />
+            </Box>
         </Box>
       )}
     </Box>

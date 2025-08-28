@@ -3,13 +3,19 @@ import React from "react";
 import { List } from "@mui/material";
 import AlbumItem from "./AlbumItem";
 
-export default function AlbumList({ albums = [], onDownload }) {
-  if (!albums.length) return <p></p>;
+export default function AlbumList({ albums = [], onDownload, onPlayAlbum, setToast }) {
+  if (!albums || !Array.isArray(albums) || !albums.length) return null;
 
   return (
     <List>
-      {albums.slice(0, 5).map((album) => (
-        <AlbumItem key={album.id} album={album} onDownload={onDownload}/>
+      {albums.slice(0, 5).map((album, index) => (
+        <AlbumItem 
+          key={album.id || `album-${index}`} 
+          album={album} 
+          onDownload={onDownload}
+          onPlayAlbum={onPlayAlbum}
+          setToast={setToast}
+        />
       ))}
     </List>
   );
