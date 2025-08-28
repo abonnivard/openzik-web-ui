@@ -3,7 +3,7 @@ import React from "react";
 import { List } from "@mui/material";
 import AlbumItem from "./AlbumItem";
 
-export default function AlbumList({ albums = [], onDownload, onPlayAlbum, setToast }) {
+export default function AlbumList({ albums = [], onDownload, onPlayAlbum, onAlbumClick, setToast }) {
   if (!albums || !Array.isArray(albums) || !albums.length) return null;
 
   return (
@@ -14,6 +14,7 @@ export default function AlbumList({ albums = [], onDownload, onPlayAlbum, setToa
           album={album} 
           onDownload={onDownload}
           onPlayAlbum={onPlayAlbum}
+          onAlbumClick={onAlbumClick}
           setToast={setToast}
         />
       ))}

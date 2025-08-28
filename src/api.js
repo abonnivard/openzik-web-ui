@@ -1,4 +1,4 @@
-const BASE = "http://localhost:3000";
+const BASE = process.env.REACT_APP_API_BASE_URL || "http://localhost:3000";
 
 // Requête générique **avec token**
 async function requestWithToken(path, options = {}) {
@@ -67,13 +67,6 @@ export function apiSearchLocal(q) {
   return requestWithToken(`/library/search?q=${encodeURIComponent(q)}`);
 }
 
-// Match Spotify results with local content
-export function apiMatchWithLocal(spotifyResults) {
-  return requestWithToken("/library/match", {
-    method: "POST",
-    body: JSON.stringify({ spotifyResults }),
-  });
-}
 
 // Download album
 export function apiDownload(album) {

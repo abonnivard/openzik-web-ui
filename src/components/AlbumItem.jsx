@@ -3,8 +3,8 @@ import { Box, Avatar, Typography, IconButton, Chip } from "@mui/material";
 import DownloadIcon from "@mui/icons-material/Download";
 import PlayArrowIcon from "@mui/icons-material/PlayArrow";
 
-export default function AlbumItem({ album, onDownload, onPlayAlbum, setToast }) {
-  const isLocal = album.isLocal || album.localTracks;
+export default function AlbumItem({ album, onDownload, onPlayAlbum, onAlbumClick, setToast }) {
+  const isLocal = album.local;
   
   const handlePlay = () => {
     if (isLocal && onPlayAlbum) {
@@ -28,6 +28,12 @@ export default function AlbumItem({ album, onDownload, onPlayAlbum, setToast }) 
     }
   };
 
+  const handleAlbumClick = () => {
+    if (isLocal && onAlbumClick) {
+      onAlbumClick(album);
+    }
+  };
+
   return (
     <Box
       sx={{
@@ -44,7 +50,7 @@ export default function AlbumItem({ album, onDownload, onPlayAlbum, setToast }) 
           bgcolor: isLocal ? "rgba(29,185,84,0.15)" : "rgba(255,255,255,0.08)" 
         },
       }}
-      onClick={isLocal ? handlePlay : undefined}
+      onClick={isLocal ? handleAlbumClick : undefined}
     >
       <Avatar
         src={album.images?.[0]?.url || ""}

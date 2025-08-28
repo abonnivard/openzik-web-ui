@@ -1,13 +1,33 @@
 import React, { useEffect, useState } from "react";
-import { Box, Typography, TextField, CircularProgress } from "@mui/material";
+import { Box, Typography, TextField, CircularProgress, Avatar, Paper, useTheme, useMediaQuery } from "@mui/material";
 import TrackList from "../components/TrackList";
 import ArtistList from "../components/ArtistList";
 import AlbumList from "../components/AlbumList";
-import { apiSearch, apiSearchLocal, apiMatchWithLocal, apiAddRecentlyPlayed, apiDownload } from "../api";
+import TrackItem from "../components/TrackItem";
+import { 
+  apiSearch, 
+  apiSearchLocal, 
+  apiMatchWithLocal, 
+  apiAddRecentlyPlayed, 
+  apiDownload,
+  apiGetPlaylists,
+  apiGetLikedTracks,
+  apiAddTrackToPlaylist,
+  apiLikeTrack,
+  apiUnlikeTrack,
+  apiCreatePlaylist
+} from "../api";
+import like from "../assets/like.png";
 
 export default function Search({ setToast }) {
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
   const [query, setQuery] = useState(() => sessionStorage.getItem("searchQuery") || "");
   const [loading, setLoading] = useState(false);
+  const [selectedAlbum, setSelectedAlbum] = useState(null);
+  const [albumTracks, setAlbumTracks] = useState([]);
+  const [allPlaylists, setAllPlaylists] = useState([]);
+  const [likedTracks, setLikedTracks] = useState([]);
   const [data, setData] = useState(() => {
     const saved = sessionStorage.getItem("searchResults");
     return saved
@@ -15,18 +35,7 @@ export default function Search({ setToast }) {
       : { artists: [], albums: [], tracks: []};
   });
 
-  // Function to play a track directly
-  const handlePlayTrack = async (track) => {
-    sessionStorage.setItem("currentTrack", JSON.stringify(track));
-    sessionStorage.setItem("isPlaying", JSON.stringify(true));
-    window.dispatchEvent(new Event("storage"));
 
-    try {
-      await apiAddRecentlyPlayed(track.id);
-    } catch (err) {
-      console.error("Error adding to recently played:", err);
-    }
-  };
 
 const handleSearch = async () => {
     if (!query) return;
@@ -57,6 +66,97 @@ const handleSearch = async () => {
     }
   };
 
+  const handleAlbumClick = (album) => {
+    // Only allow click if album is local (available)
+    if (album.local) {
+      setSelectedAlbum(album);
+      // If album has localTracks, use them, otherwise use tracks
+      const tracks = album.localTracks || album.tracks || [];
+      setAlbumTracks(tracks);
+    }
+  };
+
+  const handleBackToSearch = () => {
+    setSelectedAlbum(null);
+    setAlbumTracks([]);
+  };
+
+  // Handle like/unlike tracks
+  const handleLike = async (track) => {
+    try {
+      if (likedTracks.includes(track.id)) {
+        await apiUnlikeTrack(track.id);
+        setLikedTracks(prev => prev.filter(id => id !== track.id));
+        if (setToast) {
+          setToast({ message: `"${track.title}" removed from favorites`, severity: "info" });
+        }
+      } else {
+        await apiLikeTrack(track.id);
+        setLikedTracks(prev => [...prev, track.id]);
+        if (setToast) {
+          setToast({ message: `"${track.title}" added to favorites`, severity: "success" });
+        }
+      }
+    } catch (error) {
+      console.error("Error toggling like:", error);
+      if (setToast) {
+        setToast({ message: "Error updating favorites", severity: "error" });
+      }
+    }
+  };
+
+  // Handle add to playlist
+  const handleAddToPlaylist = async (playlistId, track) => {
+    try {
+      await apiAddTrackToPlaylist(playlistId, track.id);
+      const playlist = allPlaylists.find(p => p.id === playlistId);
+      
+      if (setToast) {
+        setToast({ message: `"${track.title}" added to "${playlist?.name}"`, severity: "success" });
+      }
+    } catch (error) {
+      console.error("Error adding to playlist:", error);
+      if (setToast) {
+        setToast({ message: "Error adding to playlist", severity: "error" });
+      }
+    }
+  };
+
+  // Handle create new playlist
+  const handleCreatePlaylist = async (playlistName) => {
+    try {
+      const newPlaylist = await apiCreatePlaylist(playlistName);
+      setAllPlaylists(prev => [...prev, newPlaylist]);
+      
+      if (setToast) {
+        setToast({ message: `Playlist "${playlistName}" created`, severity: "success" });
+      }
+    } catch (error) {
+      console.error("Error creating playlist:", error);
+      if (setToast) {
+        setToast({ message: "Error creating playlist", severity: "error" });
+      }
+    }
+  };
+
+
+  useEffect(() => {
+    const loadInitialData = async () => {
+      try {
+        const [playlistsData, likedData] = await Promise.all([
+          apiGetPlaylists(),
+          apiGetLikedTracks()
+        ]);
+        
+        setAllPlaylists(playlistsData);
+        setLikedTracks(likedData.map(t => t.id));
+      } catch (error) {
+        console.error("Error loading initial data:", error);
+      }
+    };
+
+    loadInitialData();
+  }, []);
 
   useEffect(() => {
     if (query && Object.values(data).every((arr) => arr.length === 0)) {
@@ -64,6 +164,78 @@ const handleSearch = async () => {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // If an album is selected, show album details
+  if (selectedAlbum) {
+    return (
+      <Box sx={{ display: "flex", flexDirection: "column", gap: 4, pb: 12 }}>
+        {/* Vue Album détaillée */}
+        <Box>
+          {/* Header de l'album */}
+          <Box sx={{ mb: 3 }}>
+            <Typography
+              sx={{ color: "#1db954", cursor: "pointer", mb: 2, fontSize: "0.9rem" }}
+              onClick={handleBackToSearch}
+            >
+              ← Back to Search
+            </Typography>
+            <Box sx={{ display: "flex", alignItems: "center", gap: 2, mb: 2 }}>
+              <Avatar
+                variant="rounded"
+                src={selectedAlbum.images?.[0]?.url || like}
+                sx={{ 
+                  width: isMobile ? 80 : 120, 
+                  height: isMobile ? 80 : 120,
+                }}
+              />
+              <Box>
+                <Typography sx={{ 
+                  color: "#fff", 
+                  fontWeight: 700, 
+                  fontSize: isMobile ? "1.5rem" : "2rem",
+                  mb: 1
+                }}>
+                  {selectedAlbum.name}
+                </Typography>
+                <Typography sx={{ 
+                  color: "rgba(255,255,255,0.7)", 
+                  fontSize: isMobile ? "0.9rem" : "1rem",
+                  mb: 1
+                }}>
+                  {selectedAlbum.artist || selectedAlbum.artists?.map((a) => a.name).join(", ")}
+                </Typography>
+                <Typography sx={{ 
+                  color: "rgba(255,255,255,0.7)", 
+                  fontSize: isMobile ? "0.8rem" : "0.9rem"
+                }}>
+                  {albumTracks.length} tracks available
+                </Typography>
+              </Box>
+            </Box>
+          </Box>
+
+          {/* Liste des tracks de l'album */}
+          <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
+            <TrackList
+              tracks={
+                albumTracks.map(track => ({
+                  ...track,
+                  local: true
+                }))
+              }
+              displayAlbum={true}
+              setToast={setToast}
+              playlists={allPlaylists.filter(p => p.id !== 'liked')}
+              likedTracks={likedTracks}
+              onAddToPlaylist={handleAddToPlaylist}
+              onToggleLike={handleLike}
+              onCreatePlaylist={handleCreatePlaylist}
+            />
+          </Box>
+        </Box>
+      </Box>
+    );
+  }
 
   return (
     <Box
@@ -112,6 +284,7 @@ const handleSearch = async () => {
               <AlbumList 
                 albums={data.albums} 
                 onDownload={handleDownload}
+                onAlbumClick={handleAlbumClick}
                 setToast={setToast}
               />
             </Box>

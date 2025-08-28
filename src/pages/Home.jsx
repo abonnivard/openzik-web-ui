@@ -36,6 +36,7 @@ import {
   apiRemoveTrackFromPlaylist,
   apiCreatePlaylist,
 } from "../api";
+import { getFileUrl } from "../utils";
 import TrackMenu from "../components/TrackMenu";
 import PlaylistMenu from "../components/PlaylistMenu";
 import CreatePlaylistDialog from "../components/CreatePlaylistDialog";
@@ -252,7 +253,7 @@ export default function Home({ setToast }) {
         // Recently played - distinct by track ID (we want at least 6)
         const formattedRecent = recentData.map(t => ({
           ...t,
-          url: `http://localhost:3000/${t.file_path.split(/[\\/]/).map(encodeURIComponent).join("/")}`
+          url: getFileUrl(t.file_path)
         }));
         
         // Keep only distinct tracks (by ID), limit to 6 for display
@@ -278,7 +279,7 @@ export default function Home({ setToast }) {
                 ...playlist,
                 tracks: tracks.map(t => ({
                   ...t,
-                  url: `http://localhost:3000/${t.file_path.split(/[\\/]/).map(encodeURIComponent).join("/")}`
+                  url: getFileUrl(t.file_path)
                 }))
               };
             } catch (error) {
@@ -294,7 +295,7 @@ export default function Home({ setToast }) {
           name: 'Liked Songs',
           tracks: likedData.map(t => ({
             ...t,
-            url: `http://localhost:3000/${t.file_path.split(/[\\/]/).map(encodeURIComponent).join("/")}`
+            url: getFileUrl(t.file_path)
           })),
           image: likedData[0]?.image || null,
           isLikedPlaylist: true
@@ -306,7 +307,7 @@ export default function Home({ setToast }) {
 
         const formattedTop = topTracksData.map(t => ({
           ...t,
-          url: `http://localhost:3000/${t.file_path.split(/[\\/]/).map(encodeURIComponent).join("/")}`
+          url: getFileUrl(t.file_path)
         }));
         setTopTracks(formattedTop);
 
@@ -326,7 +327,7 @@ export default function Home({ setToast }) {
           const likedData = await apiGetLikedTracks();
           const formattedLiked = likedData.map(t => ({
             ...t,
-            url: `http://localhost:3000/${t.file_path.split(/[\\/]/).map(encodeURIComponent).join("/")}`
+            url: getFileUrl(t.file_path)
           }));
 
           // Update the liked playlist in the playlists array

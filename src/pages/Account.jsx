@@ -121,7 +121,7 @@ export default function Account({ setToast }) {
       </Box>
 
       {/* Mobile: Profile Preview First */}
-      <Box sx={{ display: { xs: "block", lg: "none" }, mb: 3 }}>
+      <Box sx={{ display: { xs: "block", lg: "none" }}}>
         <Card
           sx={{
             bgcolor: "rgba(255,255,255,0.05)",
