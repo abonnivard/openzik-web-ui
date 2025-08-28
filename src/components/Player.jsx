@@ -18,9 +18,7 @@ import RepeatOneIcon from "@mui/icons-material/RepeatOne";
 import CloseIcon from "@mui/icons-material/Close";
 import FavoriteIcon from "@mui/icons-material/Favorite";
 import FavoriteBorderIcon from "@mui/icons-material/FavoriteBorder";
-import PlaylistAddIcon from "@mui/icons-material/PlaylistAdd";
 import { apiLikeTrack, apiUnlikeTrack, apiGetLikedTracks } from "../api";
-import PlaylistMenu from "./PlaylistMenu";
 
 export default function Player() {
   const audioRef = useRef(null);

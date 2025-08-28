@@ -7,8 +7,6 @@ import {
   Card, 
   CardContent, 
   Grid, 
-  Divider,
-  Avatar,
   IconButton
 } from "@mui/material";
 import { Person, Lock, Edit } from "@mui/icons-material";

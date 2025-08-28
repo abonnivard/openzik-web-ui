@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from "react";
-import { Navigate } from "react-router-dom";
 import { Box, Typography, CircularProgress } from "@mui/material";
 import { AdminPanelSettings } from "@mui/icons-material";
 import { apiGetUserProfile } from "../api";

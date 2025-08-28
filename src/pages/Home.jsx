@@ -7,14 +7,10 @@ import {
   Avatar, 
   useTheme, 
   useMediaQuery, 
-  Grid, 
-  Card,
-  CardContent,
   IconButton,
   Chip
 } from "@mui/material";
 import { 
-  PlayArrow, 
   Favorite, 
   FavoriteBorder,
   PushPin,
@@ -72,9 +68,7 @@ function addToQueue(track, setToast) {
 
 export default function Home({ setToast }) {
   const theme = useTheme();
-  const navigate = useNavigate();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
-  const isTablet = useMediaQuery(theme.breakpoints.down("md"));
 
   const [playlists, setPlaylists] = useState([]);
   const [recentTracks, setRecentTracks] = useState([]);
@@ -385,7 +379,7 @@ export default function Home({ setToast }) {
     };
 
     updateLikedSongsPlaylist();
-  }, [likedTracks, selectedPlaylist?.isLikedPlaylist]);
+  }, [likedTracks, selectedPlaylist]);
 
   // Recharger les tracks de la playlist sélectionnée si elle existe dans sessionStorage
   useEffect(() => {
@@ -428,7 +422,7 @@ export default function Home({ setToast }) {
     if (playlists.length > 0 || recentTracks.length > 0) {
       loadSelectedPlaylistTracks();
     }
-  }, [playlists, recentTracks]); // Déclencher après le chargement initial
+  }, [selectedPlaylist, playlists, recentTracks]); // Déclencher après le chargement initial
 
   const handlePlayTrack = async (track) => {
     await playTrack(track);

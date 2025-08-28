@@ -21,7 +21,6 @@ import {
   FormControlLabel,
   Chip,
   Grid,
-  Paper,
   Tooltip,
   Alert,
   Avatar
@@ -81,10 +80,6 @@ export default function Administration({ setToast }) {
     }
   };
 
-  useEffect(() => {
-    loadData();
-  }, []);
-
   const loadData = async () => {
     try {
       const [usersData, statsData] = await Promise.all([
@@ -100,6 +95,10 @@ export default function Administration({ setToast }) {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    loadData();
+  }, []);
 
   const handleCreateUser = () => {
     setEditingUser(null);

@@ -227,7 +227,7 @@ export default function UserPlaylists({ setToast }) {
     return () => {
       window.removeEventListener('likedTracksChanged', handleLikedTracksChanged);
     };
-  }, [selectedPlaylist?.isLikedPlaylist]);
+  }, [selectedPlaylist]);
 
   // ----- Like / Unlike -----
   const handleLike = async (track) => {
