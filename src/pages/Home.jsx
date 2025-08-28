@@ -394,7 +394,7 @@ export default function Home({ setToast }) {
               url: `http://localhost:3000/${t.file_path.split(/[\\/]/).map(encodeURIComponent).join("/")}`
             }));
             setPlaylistTracks(formattedLiked);
-            setSelectedPlaylist({ ...selectedPlaylist, tracks: formattedLiked });
+            // Ne pas mettre à jour selectedPlaylist ici pour éviter les boucles
           } catch (error) {
             console.error('Erreur rechargement liked tracks:', error);
           }
@@ -407,7 +407,7 @@ export default function Home({ setToast }) {
               url: `http://localhost:3000/${t.file_path.split(/[\\/]/).map(encodeURIComponent).join("/")}`
             }));
             setPlaylistTracks(formattedTracks);
-            setSelectedPlaylist({ ...selectedPlaylist, tracks: formattedTracks });
+            // Ne pas mettre à jour selectedPlaylist ici pour éviter les boucles
           } catch (error) {
             console.error('Erreur rechargement tracks playlist:', error);
             // Si erreur, reset la playlist sélectionnée
@@ -419,10 +419,49 @@ export default function Home({ setToast }) {
     };
 
     // Attendre que les données initiales soient chargées avant de charger la playlist
-    if (playlists.length > 0 || recentTracks.length > 0) {
+    if ((playlists.length > 0 || recentTracks.length > 0) && selectedPlaylist) {
       loadSelectedPlaylistTracks();
     }
-  }, [selectedPlaylist, playlists, recentTracks]); // Déclencher après le chargement initial
+  }, [playlists, recentTracks]); // Retirer selectedPlaylist des dépendances pour éviter les boucles
+
+  // Charger les tracks quand une playlist est sélectionnée
+  useEffect(() => {
+    const loadPlaylistTracks = async () => {
+      if (selectedPlaylist) {
+        console.log("Loading tracks for selected playlist:", selectedPlaylist);
+        if (selectedPlaylist.isLikedPlaylist) {
+          try {
+            const likedData = await apiGetLikedTracks();
+            const formattedLiked = likedData.map(t => ({
+              ...t,
+              url: `http://localhost:3000/${t.file_path.split(/[\\/]/).map(encodeURIComponent).join("/")}`
+            }));
+            setPlaylistTracks(formattedLiked);
+          } catch (error) {
+            console.error('Erreur chargement liked tracks:', error);
+          }
+        } else if (selectedPlaylist.id) {
+          try {
+            const tracks = await apiGetPlaylistTracks(selectedPlaylist.id);
+            const formattedTracks = tracks.map(t => ({
+              ...t,
+              url: `http://localhost:3000/${t.file_path.split(/[\\/]/).map(encodeURIComponent).join("/")}`
+            }));
+            setPlaylistTracks(formattedTracks);
+          } catch (error) {
+            console.error('Erreur chargement tracks playlist:', error);
+            setSelectedPlaylist(null);
+            setPlaylistTracks([]);
+          }
+        }
+      } else {
+        console.log("No playlist selected, clearing tracks");
+        setPlaylistTracks([]);
+      }
+    };
+
+    loadPlaylistTracks();
+  }, [selectedPlaylist]); // Se déclencher uniquement quand selectedPlaylist change
 
   const handlePlayTrack = async (track) => {
     await playTrack(track);
@@ -461,6 +500,8 @@ export default function Home({ setToast }) {
   };
 
   const handleBackToHome = () => {
+    console.log("Back to Home clicked - clearing selectedPlaylist");
+    sessionStorage.removeItem("selectedPlaylist");
     setSelectedPlaylist(null);
     setPlaylistTracks([]);
   };

@@ -1,14 +1,10 @@
 import React, { useEffect, useState } from "react";
-import { Box, Typography, TextField, CircularProgress, Avatar, Paper, useTheme, useMediaQuery } from "@mui/material";
+import { Box, Typography, TextField, CircularProgress, Avatar, useTheme, useMediaQuery } from "@mui/material";
 import TrackList from "../components/TrackList";
 import ArtistList from "../components/ArtistList";
 import AlbumList from "../components/AlbumList";
-import TrackItem from "../components/TrackItem";
 import { 
   apiSearch, 
-  apiSearchLocal, 
-  apiMatchWithLocal, 
-  apiAddRecentlyPlayed, 
   apiDownload,
   apiGetPlaylists,
   apiGetLikedTracks,
