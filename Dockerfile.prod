@@ -3,39 +3,36 @@ FROM node:18-alpine AS build
 
 WORKDIR /app
 
-# Copier les fichiers package
+# Copier les fichiers package en premier pour le cache des dépendances
 COPY package*.json ./
 
-# Installer les dépendances
-RUN npm ci
+# Installer les dépendances avec cache npm
+RUN npm ci --only=production --no-audit --no-fund
+
+# Variables d'environnement pour React
+ARG REACT_APP_API_BASE_URL=http://localhost:3001
+ENV REACT_APP_API_BASE_URL=$REACT_APP_API_BASE_URL
 
 # Copier le code source
 COPY . .
 
-# Variables d'environnement pour React
-ARG REACT_APP_API_BASE_URL=http://localhost:3001/api
-ENV REACT_APP_API_BASE_URL=$REACT_APP_API_BASE_URL
-
 # Build l'application
 RUN npm run build
 
-# Stage de production avec serve
+# Stage de production avec serve (image plus légère)
 FROM node:18-alpine
 
 WORKDIR /app
 
 # Installer serve globalement
-RUN npm install -g serve
+RUN npm install -g serve@14 --no-audit --no-fund
 
 # Créer un groupe et un utilisateur non-root
 RUN addgroup -g 1001 frontend && \
     adduser -S -u 1001 -G frontend frontend
 
 # Copier les fichiers buildés
-COPY --from=build /app/build ./build
-
-# Changer la propriété
-RUN chown -R frontend:frontend /app
+COPY --from=build --chown=frontend:frontend /app/build ./build
 
 # Passer à l'utilisateur non-root
 USER frontend
@@ -43,7 +40,5 @@ USER frontend
 # Exposer le port 3000
 EXPOSE 3000
 
-
-
 # Démarrer serve
-CMD ["serve", "-s", "build", "-l", "3000"]
+CMD ["serve", "-s", "build", "-l", "3000", "--no-clipboard"]
