@@ -99,3 +99,54 @@ Authentication is handled using **JWT**, stored on the frontend.
 * `npm run dev` → Start the project in development mode
 * `npm run build` → Build the project for production
 * `npm run preview` → Preview the production build locally
+
+## 📱 iOS App Development
+
+This project now includes iOS app development using Capacitor. The iOS app uses the same React codebase as the web version.
+
+### iOS Setup Requirements
+
+1. **macOS** with Xcode 14+ installed
+2. **Ruby 3.1+** (for CocoaPods)
+3. **CocoaPods** installed
+
+### iOS Development Commands
+
+```bash
+# Build React app and sync with iOS
+npm run ios:build
+
+# Open the iOS project in Xcode
+npm run ios:open
+
+# Run on iOS simulator directly
+npm run ios:run
+
+# Build and open in one command
+npm run ios:dev
+```
+
+### iOS Project Structure
+```
+ios/
+├── App/                   # iOS app project
+│   ├── App.xcodeproj     # Xcode project
+│   ├── App/              # App source files
+│   │   ├── public/       # Web assets (auto-generated)
+│   │   └── ...
+│   └── Podfile           # CocoaPods dependencies
+└── ...
+```
+
+### Building for iOS
+
+1. First build the React app: `npm run build`
+2. Sync with Capacitor: `npx cap sync ios`
+3. Open in Xcode: `npx cap open ios`
+4. In Xcode, select your target device/simulator and click "Run"
+
+### Troubleshooting iOS
+
+- If you get Node.js version errors, this project uses Capacitor v6 which is compatible with Node 18+
+- Make sure CocoaPods is installed: `gem install cocoapods`
+- If pod install fails, try: `cd ios/App && pod install --repo-update`

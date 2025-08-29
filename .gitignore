@@ -17,7 +17,16 @@
 .env.development.local
 .env.test.local
 .env.production.local
+.env.ios
 
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+
+# iOS app (Capacitor)
+/ios/App/Pods
+/ios/App/Podfile.lock
+/ios/App/build
+/ios/App/App.xcworkspace/xcuserdata
+/ios/App/App.xcodeproj/xcuserdata
+/ios/App/App.xcodeproj/project.xcworkspace/xcuserdata

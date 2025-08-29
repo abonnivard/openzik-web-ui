@@ -19,6 +19,8 @@ import CloseIcon from "@mui/icons-material/Close";
 import FavoriteIcon from "@mui/icons-material/Favorite";
 import FavoriteBorderIcon from "@mui/icons-material/FavoriteBorder";
 import { apiLikeTrack, apiUnlikeTrack, apiGetLikedTracks } from "../api";
+import { useOfflineMode } from "../hooks/useOfflineMode";
+import authStorage from "../services/authStorage";
 
 export default function Player() {
   const audioRef = useRef(null);
@@ -32,9 +34,37 @@ export default function Player() {
   const [isShuffle, setIsShuffle] = useState(false);
   const [repeatMode, setRepeatMode] = useState("off"); // off | all | one
   const [openMobile, setOpenMobile] = useState(false);
+  const { shouldUseOfflineMode } = useOfflineMode();
+
+  // Swipe down detection
+  const [touchStart, setTouchStart] = useState(null);
+  const [touchEnd, setTouchEnd] = useState(null);
 
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
+
+  // Swipe detection functions
+  const handleTouchStart = (e) => {
+    setTouchStart(e.touches[0].clientY);
+  };
+
+  const handleTouchMove = (e) => {
+    setTouchEnd(e.touches[0].clientY);
+  };
+
+  const handleTouchEnd = () => {
+    if (!touchStart || !touchEnd) return;
+    
+    const distance = touchStart - touchEnd;
+    const isDownSwipe = distance < -50; // Swipe down (at least 50px)
+    
+    if (isDownSwipe) {
+      setOpenMobile(false);
+    }
+    
+    setTouchStart(null);
+    setTouchEnd(null);
+  };
 
   // Load queue from sessionStorage
   useEffect(() => {
@@ -68,6 +98,17 @@ export default function Player() {
 
   // Load liked tracks
   useEffect(() => {
+    if (shouldUseOfflineMode) {
+      // En mode offline, charger les likes depuis localStorage
+      try {
+        const localLiked = JSON.parse(localStorage.getItem('likedTracks') || '[]');
+        setLikedTracks(localLiked.map(t => t.id));
+      } catch (error) {
+        console.error("Error loading offline liked tracks:", error);
+      }
+      return;
+    }
+
     const fetchLikedTracks = async () => {
       try {
         const liked = await apiGetLikedTracks();
@@ -88,10 +129,32 @@ export default function Player() {
     return () => {
       window.removeEventListener('likedTracksChanged', handleLikedTracksChanged);
     };
-  }, []);
+  }, [shouldUseOfflineMode]);
 
   // Handle like/unlike
   const handleLike = useCallback(async (trackId) => {
+    if (shouldUseOfflineMode) {
+      // En mode offline, gérer les likes localement
+      try {
+        const localLiked = JSON.parse(localStorage.getItem('likedTracks') || '[]');
+        const isLiked = localLiked.some(t => t.id === trackId);
+        
+        if (isLiked) {
+          const filtered = localLiked.filter(t => t.id !== trackId);
+          localStorage.setItem('likedTracks', JSON.stringify(filtered));
+          setLikedTracks(filtered.map(t => t.id));
+        } else {
+          // Ajouter la track aux likes avec les infos actuelles
+          const newLiked = [...localLiked, currentTrack];
+          localStorage.setItem('likedTracks', JSON.stringify(newLiked));
+          setLikedTracks(newLiked.map(t => t.id));
+        }
+      } catch (error) {
+        console.error("Error toggling offline like:", error);
+      }
+      return;
+    }
+
     try {
       if (likedTracks.includes(trackId)) {
         await apiUnlikeTrack(trackId);
@@ -105,7 +168,7 @@ export default function Player() {
     } catch (error) {
       console.error("Error toggling like:", error);
     }
-  }, [likedTracks]);
+  }, [likedTracks, shouldUseOfflineMode, currentTrack]);
 
   // Charger la library depuis la playlist en cours si existante
   useEffect(() => {
@@ -404,26 +467,21 @@ const handlePrev = useCallback(() => {
         sx={{
           width: "100%",
           bgcolor: "rgba(20,20,20,0.95)",
-          position: "fixed",
-          bottom: 0,
-          left: 0,
           display: "flex",
           flexDirection: "column",
           px: 2,
-          py: 1.5,
-          mb: 5, // Space for bottom navigation
+          py: 0.5, // Réduit de 1.5 à 0.5
           backdropFilter: "blur(10px)",
-          zIndex: 1000,
           borderTop: "1px solid rgba(255,255,255,0.1)",
         }}
       >
         <Box sx={{ display: "flex", alignItems: "center", gap: 2, width: "100%", cursor: "pointer" }}
              onClick={() => setOpenMobile(true)}
         >
-          <Avatar src={currentTrack.image || ""} alt={currentTrack.title} variant="rounded" sx={{ width: 40, height: 40 }} />
+          <Avatar src={currentTrack.image || ""} alt={currentTrack.title} variant="rounded" sx={{ width: 35, height: 35 }} />
           <Box sx={{ flex: 1, overflow: "auto" }}>
-            <Typography noWrap sx={{ color: "#fff", fontWeight: 600, fontSize: "0.8rem" }}>{currentTrack.title}</Typography>
-            <Typography noWrap sx={{ color: "rgba(255,255,255,0.7)", fontSize: "0.65rem" }}>{currentTrack.artist}</Typography>
+            <Typography noWrap sx={{ color: "#fff", fontWeight: 600, fontSize: "0.75rem" }}>{currentTrack.title}</Typography>
+            <Typography noWrap sx={{ color: "rgba(255,255,255,0.7)", fontSize: "0.6rem" }}>{currentTrack.artist}</Typography>
           </Box>
           
           {/* Mini player buttons */}
@@ -435,7 +493,7 @@ const handlePrev = useCallback(() => {
               }} 
               sx={{ 
                 color: currentTrack && likedTracks.includes(currentTrack.id) ? "#1db954" : "rgba(255,255,255,0.7)",
-                p: 1
+                p: 0.5
               }}
               size="small"
             >
@@ -451,8 +509,8 @@ const handlePrev = useCallback(() => {
               sx={{ 
                 color: "#000", 
                 bgcolor: "#1db954",
-                width: 36,
-                height: 36,
+                width: 32,
+                height: 32,
                 ml: 0.5,
                 "&:hover": { bgcolor: "#1ed760" }
               }}
@@ -462,63 +520,136 @@ const handlePrev = useCallback(() => {
           </Box>
         </Box>
         
-        <Box sx={{ width: "100%", mt: 1 }}>
+        {/* Slider plus visible */}
+        <Box sx={{ width: "100%", mt: 0.5, mb: 0.5 }}>
           <Slider value={progress} max={duration} onChange={handleSeek} sx={{
             color: "#1db954",
-            height: 3,
-            "& .MuiSlider-thumb": { width: 12, height: 12 },
-            "& .MuiSlider-rail": { height: 3, opacity: 0.3, bgcolor: "rgba(255,255,255,0.3)" },
-            "& .MuiSlider-track": { height: 3 },
+            height: 4, // Plus visible
+            "& .MuiSlider-thumb": { 
+              width: 12, 
+              height: 12,
+              "&:hover": { boxShadow: "0 0 0 8px rgba(29, 185, 84, 0.16)" }
+            },
+            "& .MuiSlider-rail": { 
+              height: 4, 
+              opacity: 0.3, 
+              bgcolor: "rgba(255,255,255,0.3)" 
+            },
+            "& .MuiSlider-track": { height: 4 },
           }} />
         </Box>
       </Box>
 
       {/* === Expanded Mobile Player === */}
       {openMobile && (
-        <Box sx={{
-          position: "fixed",
-          left: 0,
-          top: 56, // Hauteur de la barre du haut
-          right: 0,
-          bottom: 56, // Hauteur de la navbar du bas
-          bgcolor: "#121212",
-          color: "#fff",
-          zIndex: 1100,
-          display: "flex",
-          width: "100%",
-          flexDirection: "column",
-          alignItems: "center",
-          justifyContent: "space-between",
-          transform: openMobile ? "translateY(0)" : "translateY(100%)",
-          transition: "transform 0.3s ease",
-        }}>
-          <IconButton onClick={() => setOpenMobile(false)} sx={{ alignSelf: "flex-end", color: "#fff", fontSize: "2rem", mb: 1 }}>
-            <CloseIcon fontSize="large" />
-          </IconButton>
+        <Box 
+          sx={{
+            position: "fixed",
+            left: 0,
+            top: "calc(env(safe-area-inset-top) + 56px)", // Safe area + navbar top
+            right: 0,
+            bottom: "calc(env(safe-area-inset-bottom) + 56px)", // Safe area + navbar bottom
+            bgcolor: "#121212",
+            color: "#fff",
+            zIndex: 1100,
+            display: "flex",
+            width: "100%",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "space-between",
+            transform: openMobile ? "translateY(0)" : "translateY(100%)",
+            transition: "transform 0.3s ease",
+          }}
+          onTouchStart={handleTouchStart}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
+        >
+          {/* Header avec Close à gauche et Like à droite */}
+          <Box sx={{ 
+            display: "flex", 
+            justifyContent: "space-between", 
+            alignItems: "center", 
+            width: "100%", 
+            px: 2, 
+            pt: 1 
+          }}>
+            <IconButton onClick={() => setOpenMobile(false)} sx={{ color: "#fff", fontSize: "1.5rem" }}>
+              <CloseIcon fontSize="large" />
+            </IconButton>
+            <Box /> {/* Spacer pour centrer */}
+            <IconButton 
+              onClick={() => currentTrack && handleLike(currentTrack.id)} 
+              sx={{ 
+                color: currentTrack && likedTracks.includes(currentTrack.id) ? "#1db954" : "rgba(255,255,255,0.7)",
+                fontSize: "1.5rem"
+              }}
+            >
+              {currentTrack && likedTracks.includes(currentTrack.id) ? <FavoriteIcon fontSize="inherit" /> : <FavoriteBorderIcon fontSize="inherit" />}
+            </IconButton>
+          </Box>
           
-          <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", flex: 1, justifyContent: "flex-start", gap: 2, mt: 2 }}>
+          {/* Container principal responsive - plus compact */}
+          <Box sx={{ 
+            display: "flex", 
+            flexDirection: "column", 
+            alignItems: "center", 
+            flex: 1, 
+            justifyContent: "flex-start", // Changed from space-between to flex-start
+            gap: { xs: 0.5, sm: 1 }, // Réduit de 1-2 à 0.5-1
+            px: 2,
+            py: 0.5, // Réduit de 1
+            maxHeight: "100%",
+            overflow: "hidden",
+            mt: 4,
+          }}>
+            {/* Image de l'album - responsive */}
             <Avatar 
               src={currentTrack.image || ""} 
               alt={currentTrack.title} 
               variant="rounded" 
               sx={{ 
-                width: { xs: 300, sm: 350 }, 
-                height: { xs: 300, sm: 350 }, 
+                width: { xs: "70vw", sm: "60vw", md: 280 }, 
+                height: { xs: "70vw", sm: "60vw", md: 280 }, 
+                maxWidth: 320,
+                maxHeight: 320,
                 borderRadius: 3,
-                boxShadow: "0 8px 32px rgba(0,0,0,0.4)"
+                boxShadow: "0 8px 32px rgba(0,0,0,0.4)",
+                flexShrink: 0
               }} 
             />
             
-            <Box sx={{ textAlign: "center", width: "100%", mt: 2 }}>
-              <Typography variant="h4" sx={{ fontWeight: 600, mb: 1, fontSize: "1.3rem" }}>
+            {/* Infos du track - plus compact */}
+            <Box sx={{ textAlign: "center", width: "100%", px: 1, flexShrink: 0, mt: 4 }}>
+              <Typography 
+                variant="h4" 
+                sx={{ 
+                  fontWeight: 600, 
+                  mb: 0.2, // Réduit de 0.5 à 0.2
+                  fontSize: { xs: "1.1rem", sm: "1.3rem" },
+                  lineHeight: 1.2,
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap"
+                }}
+              >
                 {currentTrack.title}
               </Typography>
-              <Typography variant="h6" sx={{ color: "rgba(255,255,255,0.7)", fontSize: "1rem" }}>
+              <Typography 
+                variant="h6" 
+                sx={{ 
+                  color: "rgba(255,255,255,0.7)", 
+                  fontSize: { xs: "0.9rem", sm: "1rem" },
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap"
+                }}
+              >
                 {currentTrack.artist}
               </Typography>
             </Box>
             
-            <Box sx={{ width: "100%", px: 2, mb:2 }}>
+            {/* Slider et temps - plus compact */}
+            <Box sx={{ width: "100%", px: 1, flexShrink: 0}}>
               <Slider 
                 value={progress} 
                 max={duration} 
@@ -526,11 +657,14 @@ const handlePrev = useCallback(() => {
                 sx={{ 
                   color: "#1db954", 
                   width: "100%", 
-                  mb: 0,
-                  height: 6,
-                  "& .MuiSlider-thumb": { width: 20, height: 20 },
-                  "& .MuiSlider-track": { height: 6 },
-                  "& .MuiSlider-rail": { height: 6, opacity: 0.3 }
+                  mb: 1,
+                  height: { xs: 4, sm: 6 },
+                  "& .MuiSlider-thumb": { 
+                    width: { xs: 16, sm: 20 }, 
+                    height: { xs: 16, sm: 20 } 
+                  },
+                  "& .MuiSlider-track": { height: { xs: 4, sm: 6 } },
+                  "& .MuiSlider-rail": { height: { xs: 4, sm: 6 }, opacity: 0.3 }
                 }} 
               />
               <Box sx={{ display: "flex", justifyContent: "space-between", width: "100%" }}>
@@ -544,54 +678,74 @@ const handlePrev = useCallback(() => {
             </Box>
           </Box>
 
-          {/* Bottom action buttons */}
+          {/* Boutons de contrôle - plus compacts */}
           <Box sx={{ 
             display: "flex", 
             alignItems: "center", 
-            justifyContent: "space-around", 
-            width: "100%", 
-            maxWidth: 400,
-            px: 2,
-            mb: 2
+            justifyContent: "center", 
+            gap: { xs: 3, sm: 4 }, 
+            width: "100%",
+            flexShrink: 0,
+            pt: 1, // Padding top au lieu de pb
+            mb: "10%" // Margin bottom pour espacer du bas
           }}>
+            {/* Shuffle */}
             <IconButton 
-              onClick={() => currentTrack && handleLike(currentTrack.id)} 
+              onClick={toggleShuffle} 
               sx={{ 
-                color: currentTrack && likedTracks.includes(currentTrack.id) ? "#1db954" : "rgba(255,255,255,0.7)",
-                fontSize: "2rem"
+                color: isShuffle ? "#1db954" : "rgba(255,255,255,0.7)", 
+                fontSize: { xs: "1.5rem", sm: "2rem" }
               }}
             >
-              {currentTrack && likedTracks.includes(currentTrack.id) ? <FavoriteIcon fontSize="large" /> : <FavoriteBorderIcon fontSize="large" />}
+              <ShuffleIcon fontSize="inherit" />
             </IconButton>
-          
-          </Box>
 
-          {/* Main control buttons */}
-          <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 3, mb: 10 }}>
-            <IconButton onClick={toggleShuffle} sx={{ color: isShuffle ? "#1db954" : "rgba(255,255,255,0.7)", fontSize: "2rem" }}>
-              <ShuffleIcon fontSize="large" />
-            </IconButton>
-            <IconButton onClick={handlePrev} sx={{ color: "#fff", fontSize: "2.5rem" }}>
+            {/* Previous */}
+            <IconButton 
+              onClick={handlePrev} 
+              sx={{ 
+                color: "#fff", 
+                fontSize: { xs: "2rem", sm: "2.5rem" }
+              }}
+            >
               <SkipPreviousIcon fontSize="inherit" />
             </IconButton>
+
+            {/* Play/Pause - bouton principal */}
             <IconButton 
               onClick={togglePlay} 
               sx={{ 
                 color: "#000", 
                 bgcolor: "#1db954",
-                fontSize: "3rem",
-                width: 70,
-                height: 70,
+                fontSize: { xs: "2.5rem", sm: "3rem" },
+                width: { xs: 60, sm: 70 },
+                height: { xs: 60, sm: 70 },
                 "&:hover": { bgcolor: "#1ed760" }
               }}
             >
               {isPlaying ? <PauseIcon fontSize="inherit" /> : <PlayArrowIcon fontSize="inherit" />}
             </IconButton>
-            <IconButton onClick={handleNext} sx={{ color: "#fff", fontSize: "2.5rem" }}>
+
+            {/* Next */}
+            <IconButton 
+              onClick={handleNext} 
+              sx={{ 
+                color: "#fff", 
+                fontSize: { xs: "2rem", sm: "2.5rem" }
+              }}
+            >
               <SkipNextIcon fontSize="inherit" />
             </IconButton>
-            <IconButton onClick={toggleRepeat} sx={{ color: repeatMode !== "off" ? "#1db954" : "rgba(255,255,255,0.7)", fontSize: "2rem" }}>
-              {repeatMode === "one" ? <RepeatOneIcon fontSize="large" /> : <RepeatIcon fontSize="large" />}
+
+            {/* Repeat */}
+            <IconButton 
+              onClick={toggleRepeat} 
+              sx={{ 
+                color: repeatMode !== "off" ? "#1db954" : "rgba(255,255,255,0.7)", 
+                fontSize: { xs: "1.5rem", sm: "2rem" }
+              }}
+            >
+              {repeatMode === "one" ? <RepeatOneIcon fontSize="inherit" /> : <RepeatIcon fontSize="inherit" />}
             </IconButton>
           </Box>
         </Box>

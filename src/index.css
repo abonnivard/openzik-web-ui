@@ -7,6 +7,23 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+/* Support for iPhone safe areas */
+html, body, #root {
+  height: 100%;
+  padding: 0;
+  margin: 0;
+  /* Prevent bounce scrolling on iOS */
+  overscroll-behavior: none;
+}
+
+/* Ensure safe area support */
+@supports (padding: max(0px)) {
+  body {
+    padding-left: max(0px, env(safe-area-inset-left));
+    padding-right: max(0px, env(safe-area-inset-right));
+  }
+}
+
 code {
   font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
     monospace;

@@ -13,6 +13,7 @@ import {
 } from "@mui/material";
 import { Visibility, VisibilityOff, Login as LoginIcon, Lock } from "@mui/icons-material";
 import { apiLogin, apiGetUserInfo, apiChangePassword } from "../api";
+import authStorage from "../services/authStorage";
 
 export default function Login({ onLogin }) {
   const [username, setUsername] = useState("");
@@ -49,7 +50,7 @@ export default function Login({ onLogin }) {
       console.log("Login successful:", res);
 
       // Stocker temporairement le token pour appeler apiGetUserInfo
-      sessionStorage.setItem("token", res.token);
+      authStorage.setToken(res.token);
 
       // 2️⃣ Vérifier must_change_password
       console.log("Getting user info...");
@@ -61,8 +62,9 @@ export default function Login({ onLogin }) {
         return;
       }
 
-      // 3️⃣ Sinon token final
-      sessionStorage.setItem("token", res.token);
+      // 3️⃣ Sinon token final et profil
+      authStorage.setToken(res.token);
+      authStorage.setUserProfile(userInfo);
       onLogin();
     } catch (err) {
       console.log("Login error caught:", err);
@@ -92,10 +94,9 @@ export default function Login({ onLogin }) {
     setLoading(true);
 
     try {
-      const tempToken = sessionStorage.getItem("token");
+      const tempToken = authStorage.getToken();
       if (!tempToken) throw new Error("Session expired, please log in again");
 
-      sessionStorage.setItem("token", tempToken);
       await apiChangePassword(username, newPassword, password);
 
       const res = await apiLogin(username, newPassword);

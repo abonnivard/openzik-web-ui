@@ -1,15 +1,37 @@
-const BASE = process.env.REACT_APP_API_BASE_URL || "http://localhost:3001";
+import configService from './services/configService';
+import authStorage from './services/authStorage';
+import { hasOfflineSupport } from './utils/platform';
+
+const getBaseUrl = () => configService.getServerUrl();
+
+// Vérifier si on est en mode offline
+const isOfflineMode = () => {
+  return hasOfflineSupport() && localStorage.getItem('forceOfflineMode') === 'true';
+};
+
+// Wrapper pour bloquer les requêtes en mode offline
+const checkOfflineMode = (functionName) => {
+  if (isOfflineMode()) {
+    console.warn(`${functionName} blocked: application is in offline mode`);
+    return Promise.reject(new Error('Application is in offline mode'));
+  }
+};
 
 // Requête générique **avec token**
 async function requestWithToken(path, options = {}) {
-  const token = sessionStorage.getItem("token");
+  checkOfflineMode('requestWithToken');
+  
+  const token = authStorage.getToken();
   const headers = { "Content-Type": "application/json", ...(options.headers || {}) };
   if (token) headers.Authorization = `Bearer ${token}`;
 
-  const res = await fetch(`${BASE}${path}`, { ...options, headers });
+  const res = await fetch(`${getBaseUrl()}${path}`, { ...options, headers });
   
   // Vérifier si le token a expiré (401 Unauthorized)
   if (res.status === 401) {
+    // Nettoyer l'authentification
+    authStorage.clearAuth();
+    
     // Déclencher l'événement d'expiration du token
     window.dispatchEvent(new CustomEvent('token-expired'));
     
@@ -38,8 +60,10 @@ async function requestWithToken(path, options = {}) {
 
 // Requête générique **sans token** (login, signup, etc.)
 async function requestWithoutToken(path, options = {}) {
+  checkOfflineMode('requestWithoutToken');
+  
   const headers = { "Content-Type": "application/json", ...(options.headers || {}) };
-  const res = await fetch(`${BASE}${path}`, { ...options, headers });
+  const res = await fetch(`${getBaseUrl()}${path}`, { ...options, headers });
   if (!res.ok) {
     let errorMessage = "API Error";
     try {

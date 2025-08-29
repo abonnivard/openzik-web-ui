@@ -6,7 +6,8 @@ import {
   Paper,
   IconButton,
   useTheme,
-  useMediaQuery
+  useMediaQuery,
+  Alert
 } from "@mui/material";
 import FavoriteIcon from "@mui/icons-material/Favorite";
 import FavoriteBorderIcon from "@mui/icons-material/FavoriteBorder";
@@ -17,6 +18,12 @@ import TrackMenu from "../components/TrackMenu";
 import CreatePlaylistDialog from "../components/CreatePlaylistDialog";
 import PlaylistMenu from "../components/PlaylistMenu";
 import ImageUploader from "../components/ImageUploader";
+import OfflineDownloadButton from "../components/OfflineDownloadButton";
+import PlaylistDownloadButton from "../components/PlaylistDownloadButton";
+import SafeAreaBox from "../components/SafeAreaBox";
+import { hasOfflineSupport } from "../utils/platform";
+import { useNetworkStatus } from "../hooks/useNetworkStatus";
+import { useOfflineMode } from "../hooks/useOfflineMode";
 import {
   apiGetPlaylists,
   apiGetLikedTracks,
@@ -100,6 +107,7 @@ export function MarqueeText({ text }) {
 export default function UserPlaylists({ setToast }) {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
+  const { isOnline } = useNetworkStatus();
 
   const [playlists, setPlaylists] = useState([]);
   const [likedTracks, setLikedTracks] = useState([]);
@@ -112,6 +120,9 @@ export default function UserPlaylists({ setToast }) {
 
   // Dialog création playlist
   const [openCreateDialog, setOpenCreateDialog] = useState(false);
+
+  // Check if should use offline mode
+  const { shouldUseOfflineMode } = useOfflineMode();
 
   // ----- Fetch data -----
   useEffect(() => {
@@ -512,6 +523,20 @@ export default function UserPlaylists({ setToast }) {
     <Box sx={{ display: "flex", flexDirection: "column", gap: 2, pb: 12 }}>
       <Typography variant="h5" sx={{ fontWeight: 700 }}>Playlists</Typography>
 
+      {/* Offline Mode Alert */}
+      {shouldUseOfflineMode && (
+        <Alert 
+          severity="info" 
+          sx={{ 
+            bgcolor: "rgba(33, 150, 243, 0.1)", 
+            color: "#90caf9",
+            border: "1px solid rgba(33, 150, 243, 0.3)"
+          }}
+        >
+          You are offline. Only downloaded playlists are available.
+        </Alert>
+      )}
+
       {/* Liste des playlists */}
       {!selectedPlaylist && displayPlaylists.map(pl => (
         <Paper
@@ -625,6 +650,15 @@ export default function UserPlaylists({ setToast }) {
                       {selectedPlaylist.tracks.length} tracks
                     </Typography>
                   </Box>
+                  
+                  {/* Playlist Download Button */}
+                  <Box ml="auto">
+                    <PlaylistDownloadButton 
+                      playlist={selectedPlaylist} 
+                      tracks={selectedPlaylist.tracks}
+                      size={isMobile ? "small" : "medium"}
+                    />
+                  </Box>
                 </Box>
               </Box>
 
@@ -712,6 +746,9 @@ export default function UserPlaylists({ setToast }) {
                     <DeleteIcon fontSize={isMobile ? "small" : "medium"} />
                   </IconButton>
                 )}
+
+                {/* Offline Download Button */}
+                <OfflineDownloadButton track={track} size={isMobile ? "small" : "medium"} />
 
                 <TrackMenu
                   track={track}

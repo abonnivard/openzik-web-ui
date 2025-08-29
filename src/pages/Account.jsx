@@ -27,6 +27,7 @@ export default function Account({ setToast }) {
         setToast({ message: "Unable to load user info", severity: "error" });
       }
     }
+    
     fetchUser();
   }, [setToast]);
 
@@ -75,7 +76,6 @@ export default function Account({ setToast }) {
       setToast({ message: "Error removing profile image ❌", severity: "error" });
     }
   };
-
 
   const textFieldSx = {
     bgcolor: "rgba(255,255,255,0.05)",

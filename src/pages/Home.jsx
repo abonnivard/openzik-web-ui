@@ -8,7 +8,8 @@ import {
   useTheme, 
   useMediaQuery, 
   IconButton,
-  Chip
+  Chip,
+  Alert
 } from "@mui/material";
 import { 
   Favorite, 
@@ -16,7 +17,8 @@ import {
   PushPin,
   TrendingUp,
   Person,
-  Delete
+  Delete,
+  WifiOff
 } from "@mui/icons-material";
 import { 
   apiAddRecentlyPlayed, 
@@ -33,9 +35,11 @@ import {
   apiCreatePlaylist,
 } from "../api";
 import { getFileUrl } from "../utils";
+import { useNetworkStatus } from "../hooks/useNetworkStatus";
 import TrackMenu from "../components/TrackMenu";
 import PlaylistMenu from "../components/PlaylistMenu";
 import CreatePlaylistDialog from "../components/CreatePlaylistDialog";
+import OfflineDownloadButton from "../components/OfflineDownloadButton";
 import like from "../assets/like.png";
 
 async function playTrack(track) {
@@ -69,6 +73,7 @@ function addToQueue(track, setToast) {
 export default function Home({ setToast }) {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
+  const isOnline = useNetworkStatus();
 
   const [playlists, setPlaylists] = useState([]);
   const [recentTracks, setRecentTracks] = useState([]);
@@ -563,6 +568,22 @@ export default function Home({ setToast }) {
 
   return (
     <Box sx={{ display: "flex", flexDirection: "column", gap: 4, pb: 12 }} >
+      {/* Alerte offline */}
+      {!isOnline && (
+        <Alert 
+          severity="warning" 
+          icon={<WifiOff />}
+          sx={{ 
+            bgcolor: "rgba(255, 193, 7, 0.1)",
+            border: "1px solid rgba(255, 193, 7, 0.3)",
+            color: "#ffc107",
+            "& .MuiAlert-icon": { color: "#ffc107" }
+          }}
+        >
+          You are offline. Only cached content and offline music are available.
+        </Alert>
+      )}
+      
       {/* Vue Playlist détaillée */}
       {selectedPlaylist ? (
         <Box>
@@ -624,14 +645,6 @@ export default function Home({ setToast }) {
                 }}
                 onClick={() => handlePlayTrack(track)}
               >
-                <Typography sx={{ 
-                  color: "rgba(255,255,255,0.5)", 
-                  fontWeight: 600,
-                  minWidth: 30,
-                  textAlign: "center"
-                }}>
-                  {index + 1}
-                </Typography>
                 <Avatar
                   variant="rounded"
                   src={track.image || like}
@@ -641,7 +654,7 @@ export default function Home({ setToast }) {
                   <Typography sx={{ 
                     color: "#fff", 
                     fontWeight: 600, 
-                    fontSize: isMobile ? "0.9rem" : "1rem",
+                    fontSize: isMobile ? "0.7rem" : "1rem",
                     whiteSpace: "nowrap",
                     overflow: "hidden",
                     textOverflow: "ellipsis",
@@ -658,7 +671,7 @@ export default function Home({ setToast }) {
                   </Typography>
                   <Typography sx={{ 
                     color: "rgba(255,255,255,0.7)", 
-                    fontSize: isMobile ? "0.8rem" : "0.9rem",
+                    fontSize: isMobile ? "0.5rem" : "0.9rem",
                     whiteSpace: "nowrap",
                     overflow: "hidden",
                     textOverflow: "ellipsis",
@@ -719,6 +732,8 @@ export default function Home({ setToast }) {
                       <Delete fontSize="small" />
                     </IconButton>
                   )}
+                  {/* Offline Download Button */}
+                  <OfflineDownloadButton track={track} size="small" />
                   <TrackMenu
                     track={track}
                     onPlay={handlePlayTrack}
@@ -997,6 +1012,7 @@ export default function Home({ setToast }) {
                     whiteSpace: "nowrap",
                     overflow: "hidden",
                     textOverflow: "ellipsis",
+                    fontSize: isMobile ? "0.7rem" : "1rem",
                     "&:hover": {
                       animation: track.title.length > 30 ? "scrollText 3s linear infinite" : "none"
                     },
@@ -1010,7 +1026,7 @@ export default function Home({ setToast }) {
                   </Typography>
                   <Typography sx={{ 
                     color: "rgba(255,255,255,0.7)", 
-                    fontSize: "0.8rem",
+                    fontSize: isMobile ? "0.5rem" : "0.8rem",
                     whiteSpace: "nowrap",
                     overflow: "hidden",
                     textOverflow: "ellipsis",

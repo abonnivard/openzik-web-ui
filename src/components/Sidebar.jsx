@@ -8,23 +8,57 @@ import {
   Box,
   useTheme,
   useMediaQuery,
+  Divider,
+  Button,
 } from "@mui/material";
-import { Home, Search, LibraryMusic, MenuBook, AccountCircle, AdminPanelSettings } from "@mui/icons-material";
+import { Home, Search, LibraryMusic, MenuBook, AccountCircle, AdminPanelSettings, CloudDownload, Logout } from "@mui/icons-material";
 import { NavLink } from "react-router-dom";
 import { apiGetUserProfile } from "../api";
+import { hasOfflineSupport } from "../utils/platform";
+import { useNetworkStatus } from "../hooks/useNetworkStatus";
+import { useOfflineMode } from "../hooks/useOfflineMode";
 import logo from "./../assets/OpenZik-logo.png";
-
-const navItems = [
-  { label: "Home", path: "/", icon: <Home /> },
-  { label: "Search", path: "/search", icon: <Search /> },
-  { label: "My Library", path: "/library", icon: <MenuBook /> },
-  { label: "Playlists", path: "/playlists", icon: <LibraryMusic /> },
-];
 
 export default function Sidebar() {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
   const [userProfile, setUserProfile] = useState(null);
+  const isOnline = useNetworkStatus();
+  const { shouldUseOfflineMode, enableOfflineMode, canGoOffline } = useOfflineMode();
+
+  // Navigation items dynamiques selon la connexion
+  const getNavItems = () => {
+    const baseItems = [
+      { label: "Home", path: "/", icon: <Home /> },
+      { label: "Library", path: "/library", icon: <MenuBook /> },
+      { label: "Playlists", path: "/playlists", icon: <LibraryMusic /> },
+    ];
+
+    if (hasOfflineSupport()) {
+      // Sur iOS, montrer Search si online et pas en mode offline forcé, Offline si offline ou mode offline forcé
+      if (isOnline && !shouldUseOfflineMode) {
+        return [
+          baseItems[0], // Home
+          { label: "Search", path: "/search", icon: <Search /> },
+          ...baseItems.slice(1) // Library et Playlists
+        ];
+      } else {
+        return [
+          ...baseItems,
+          { label: "Offline", path: "/offline", icon: <CloudDownload /> }
+        ];
+      }
+    } else {
+      // Sur web, toujours montrer Search
+      return [
+        baseItems[0], // Home
+        { label: "Search", path: "/search", icon: <Search /> },
+        ...baseItems.slice(1) // Library et Playlists
+      ];
+    }
+  };
+
+  const navItems = getNavItems();
 
   useEffect(() => {
     const fetchUserProfile = async () => {
@@ -42,11 +76,74 @@ export default function Sidebar() {
   if (isMobile) {
   return (
     <>
-      {/* Bottom navbar mobile */}
+
+      {/* Top navbar mobile avec logo à gauche et icônes à droite */}
       <Box
         sx={{
           position: "fixed",
-          bottom: 0,
+          top: hasOfflineSupport() ? "env(safe-area-inset-top)" : 0,
+          left: 0,
+          right: 0,
+          height: 56,
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          px: 2,
+          bgcolor: "rgba(20,20,20,0.95)",
+          backdropFilter: "blur(10px)",
+          borderBottom: "1px solid rgba(255,255,255,0.1)",
+          zIndex: 1200,
+        }}
+      >
+        <NavLink to="/">
+          <Box component="img" src={logo} alt="OpenZik logo" sx={{ height: 40, mt: 1 }} />
+        </NavLink>
+        
+        <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+          {/* Downloads button - uniquement si online et pas en mode offline */}
+          {hasOfflineSupport() && isOnline && !shouldUseOfflineMode && (
+            <NavLink to="/downloads">
+              <CloudDownload sx={{ fontSize: 24, color: "#fff" }} />
+            </NavLink>
+          )}
+
+          {/* Bouton Se déconnecter sur mobile iOS */}
+          {canGoOffline && isOnline && !shouldUseOfflineMode && (
+            <Button
+              onClick={enableOfflineMode}
+              sx={{
+                color: "#ff6b6b",
+                minWidth: "auto",
+                p: 0.5,
+              }}
+            >
+              <Logout sx={{ fontSize: 24 }} />
+            </Button>
+          )}
+
+          {/* Boutons seulement si pas en mode offline */}
+          {!shouldUseOfflineMode && (
+            <>
+              {/* Bouton Administration (seulement pour les admins) */}
+              {userProfile?.is_admin && (
+                <NavLink to="/administration">
+                  <AdminPanelSettings sx={{ fontSize: 28, color: "#fff", mt: 1 }} />
+                </NavLink>
+              )}
+              
+              <NavLink to="/account">
+                <AccountCircle sx={{ fontSize: 28, color: "#fff", mt: 1 }} />
+              </NavLink>
+            </>
+          )}
+        </Box>
+      </Box>
+
+      {/* Bottom navbar mobile - SIMPLIFIÉ comme avant */}
+      <Box
+        sx={{
+          position: "fixed",
+          bottom: hasOfflineSupport() ? "env(safe-area-inset-bottom)" : 0,
           left: 0,
           right: 0,
           height: 56,
@@ -132,8 +229,27 @@ export default function Sidebar() {
 
       {/* Account en bas */}
       <Box sx={{ mt: "auto", mb: 2 }}>
-        {/* Administration (seulement pour les admins) */}
-        {userProfile?.is_admin && (
+        {/* Bouton Se déconnecter sur iOS quand connecté */}
+        {canGoOffline && isOnline && !shouldUseOfflineMode && (
+          <>
+            <ListItemButton
+              onClick={enableOfflineMode}
+              sx={{
+                "&:hover": { bgcolor: "rgba(255,255,255,0.05)" },
+                color: "#ff6b6b",
+              }}
+            >
+              <ListItemIcon sx={{ color: "inherit" }}>
+                <Logout />
+              </ListItemIcon>
+              <ListItemText primary="Se déconnecter" />
+            </ListItemButton>
+            <Divider sx={{ my: 1, bgcolor: "rgba(255,255,255,0.1)" }} />
+          </>
+        )}
+
+        {/* Administration (seulement pour les admins et si pas en mode offline) */}
+        {userProfile?.is_admin && !shouldUseOfflineMode && (
           <ListItemButton
             component={NavLink}
             to="/administration"
@@ -149,19 +265,22 @@ export default function Sidebar() {
           </ListItemButton>
         )}
         
-        <ListItemButton
-          component={NavLink}
-          to="/account"
-          sx={{
-            "&.active": { color: "#1DB954" },
-            "&:hover": { bgcolor: "rgba(255,255,255,0.05)" },
-          }}
-        >
-          <ListItemIcon sx={{ color: "inherit" }}>
-            <AccountCircle />
-          </ListItemIcon>
-          <ListItemText primary="Account" />
-        </ListItemButton>
+        {/* Account seulement si pas en mode offline */}
+        {!shouldUseOfflineMode && (
+          <ListItemButton
+            component={NavLink}
+            to="/account"
+            sx={{
+              "&.active": { color: "#1DB954" },
+              "&:hover": { bgcolor: "rgba(255,255,255,0.05)" },
+            }}
+          >
+            <ListItemIcon sx={{ color: "inherit" }}>
+              <AccountCircle />
+            </ListItemIcon>
+            <ListItemText primary="Account" />
+          </ListItemButton>
+        )}
       </Box>
     </Drawer>
   );

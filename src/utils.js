@@ -1,12 +1,21 @@
 // Utility functions for the frontend
-
-const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || "http://localhost:3000";
+import configService from './services/configService';
 
 // Generate file URL from file path
 export const getFileUrl = (filePath) => {
   if (!filePath) return "";
-  return `${API_BASE_URL}/${filePath.split(/[\\/]/).map(encodeURIComponent).join("/")}`;
+  return `${configService.getServerUrl()}/${filePath.split(/[\\/]/).map(encodeURIComponent).join("/")}`;
 };
 
 // Get API base URL
-export const getApiBaseUrl = () => API_BASE_URL;
+export const getApiBaseUrl = () => configService.getServerUrl();
+
+// Format duration from seconds to MM:SS format
+export const formatDuration = (seconds) => {
+  if (!seconds || seconds < 0) return "0:00";
+  
+  const minutes = Math.floor(seconds / 60);
+  const remainingSeconds = Math.floor(seconds % 60);
+  
+  return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
+};

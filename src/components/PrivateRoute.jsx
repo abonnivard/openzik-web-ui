@@ -1,26 +1,19 @@
 import React from "react";
 import { Navigate } from "react-router-dom";
 import {jwtDecode} from "jwt-decode";
+import { hasOfflineSupport } from "../utils/platform";
+import authStorage from "../services/authStorage";
 
 export default function PrivateRoute({ children }) {
-  const token = sessionStorage.getItem("token");
+  const isOfflineMode = localStorage.getItem('forceOfflineMode') === 'true';
 
-  if (!token) {
-    return <Navigate to="/login" replace />;
+  // En mode offline sur iOS, pas besoin de token
+  if (hasOfflineSupport() && isOfflineMode) {
+    return children;
   }
 
-  try {
-    const decoded = jwtDecode(token);
-
-    // exp est en secondes depuis epoch
-    if (decoded.exp * 1000 < Date.now()) {
-      // Token expiré → supprimer et rediriger
-      sessionStorage.removeItem("token");
-      return <Navigate to="/login" replace />;
-    }
-  } catch (err) {
-    // Token invalide
-    sessionStorage.removeItem("token");
+  // Utiliser le service d'authentification
+  if (!authStorage.hasValidToken()) {
     return <Navigate to="/login" replace />;
   }
 

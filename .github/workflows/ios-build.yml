@@ -1,0 +1,72 @@
+name: Build iOS App
+
+on:
+  push:
+    branches: [ main, develop ]
+    tags: [ 'v*' ]
+    paths:
+      - 'src/**'
+      - 'public/**'
+      - 'capacitor.config.ts'
+      - 'ios/**'
+      - 'package.json'
+      - 'package-lock.json'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'src/**'
+      - 'public/**'
+      - 'capacitor.config.ts'
+      - 'ios/**'
+
+jobs:
+  build-ios:
+    runs-on: macos-latest
+    if: github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'ios')
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build React app
+        run: npm run build
+        env:
+          REACT_APP_API_BASE_URL: https://your-api-domain.com/api
+
+      - name: Setup Ruby and CocoaPods
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.1'
+          bundler-cache: false
+
+      - name: Install CocoaPods
+        run: gem install cocoapods
+          
+      - name: Sync Capacitor
+        run: npx cap sync ios
+
+      - name: Build iOS app (Debug for CI)
+        run: |
+          cd ios/App
+          xcodebuild -workspace App.xcworkspace \
+            -scheme App \
+            -configuration Debug \
+            -destination 'platform=iOS Simulator,name=iPhone 15,OS=latest' \
+            -derivedDataPath build \
+            build
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-build-artifacts
+          path: ios/App/build/Build/Products/Debug-iphonesimulator/
+          retention-days: 7

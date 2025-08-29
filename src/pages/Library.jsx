@@ -5,13 +5,17 @@ import {
   Avatar,
   TextField,
   Paper,
-  IconButton
+  IconButton,
+  Alert
 } from "@mui/material";
 import FavoriteIcon from "@mui/icons-material/Favorite";
 import FavoriteBorderIcon from "@mui/icons-material/FavoriteBorder";
+import { WifiOff } from "@mui/icons-material";
 import TrackMenu from "../components/TrackMenu";
 import PlaylistMenu from "../components/PlaylistMenu";
 import CreatePlaylistDialog from "../components/CreatePlaylistDialog";
+import OfflineDownloadButton from "../components/OfflineDownloadButton";
+import { useOfflineMode } from "../hooks/useOfflineMode";
 import {
   apiGetLibrary,
   apiGetPlaylists,
@@ -98,6 +102,9 @@ export default function Library({ setToast }) {
 
   // Dialog création playlist
   const [openCreateDialog, setOpenCreateDialog] = useState(false);
+
+  // Mode offline
+  const { shouldUseOfflineMode } = useOfflineMode();
 
   // Charger bibliothèque
   useEffect(() => {
@@ -246,6 +253,23 @@ export default function Library({ setToast }) {
       <Typography variant="h5" sx={{ fontWeight: 700 }}>
         Ma Bibliothèque
       </Typography>
+
+      {/* Message mode offline */}
+      {shouldUseOfflineMode && (
+        <Alert 
+          severity="info" 
+          icon={<WifiOff />}
+          sx={{ 
+            bgcolor: 'rgba(33, 150, 243, 0.1)',
+            color: '#fff',
+            '& .MuiAlert-icon': { color: '#2196f3' },
+            border: '1px solid rgba(33, 150, 243, 0.3)'
+          }}
+        >
+          Offline mode - Only downloaded music is available. 
+          Go to the "Offline" section to view your offline library.
+        </Alert>
+      )}
 
       {/* Champ recherche */}
       <TextField
@@ -428,6 +452,8 @@ export default function Library({ setToast }) {
                   isLiked={likedTracks.includes(track.id)}
                   onCreatePlaylist={handleCreatePlaylist}
                 />
+                {/* Offline Download Button */}
+                <OfflineDownloadButton track={track} />
                 <TrackMenu
                   track={track}
                   onPlay={playTrack}
