@@ -1,4 +1,4 @@
-const BASE = process.env.REACT_APP_API_BASE_URL || "http://localhost:3000";
+const BASE = process.env.REACT_APP_API_BASE_URL || "http://localhost:3001";
 
 // Requête générique **avec token**
 async function requestWithToken(path, options = {}) {
@@ -24,8 +24,14 @@ async function requestWithToken(path, options = {}) {
   }
   
   if (!res.ok) {
-    const errText = await res.text();
-    throw new Error(errText || "API Error");
+    let errorMessage = "API Error";
+    try {
+      const errorData = await res.json();
+      errorMessage = errorData.message || errorData.error || `API Error (${res.status})`;
+    } catch (parseError) {
+      errorMessage = `API Error (${res.status})`;
+    }
+    throw new Error(errorMessage);
   }
   return res.json();
 }
@@ -35,8 +41,14 @@ async function requestWithoutToken(path, options = {}) {
   const headers = { "Content-Type": "application/json", ...(options.headers || {}) };
   const res = await fetch(`${BASE}${path}`, { ...options, headers });
   if (!res.ok) {
-    const errText = await res.text();
-    throw new Error(errText || "API Error");
+    let errorMessage = "API Error";
+    try {
+      const errorData = await res.json();
+      errorMessage = errorData.message || errorData.error || `API Error (${res.status})`;
+    } catch (parseError) {
+      errorMessage = `API Error (${res.status})`;
+    }
+    throw new Error(errorMessage);
   }
   return res.json();
 }

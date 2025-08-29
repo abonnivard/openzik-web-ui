@@ -44,12 +44,15 @@ export default function Login({ onLogin }) {
     
     try {
       // 1️⃣ Login classique pour récupérer le token temporaire
+      console.log("Attempting login...");
       const res = await apiLogin(username, password);
+      console.log("Login successful:", res);
 
       // Stocker temporairement le token pour appeler apiGetUserInfo
       sessionStorage.setItem("token", res.token);
 
       // 2️⃣ Vérifier must_change_password
+      console.log("Getting user info...");
       const userInfo = await apiGetUserInfo();
       console.log("User info:", userInfo);
       if (userInfo.must_change_password) {
@@ -62,6 +65,7 @@ export default function Login({ onLogin }) {
       sessionStorage.setItem("token", res.token);
       onLogin();
     } catch (err) {
+      console.log("Login error caught:", err);
       setError(err.message || "Connection error. Please check your credentials.");
     } finally {
       setLoading(false);
@@ -88,14 +92,12 @@ export default function Login({ onLogin }) {
     setLoading(true);
 
     try {
-      // Utiliser le token temporaire pour changer le mot de passe
       const tempToken = sessionStorage.getItem("token");
       if (!tempToken) throw new Error("Session expired, please log in again");
 
-      sessionStorage.setItem("token", tempToken); // pour apiChangePassword
+      sessionStorage.setItem("token", tempToken);
       await apiChangePassword(username, newPassword, password);
 
-      // Après changement → login final
       const res = await apiLogin(username, newPassword);
       sessionStorage.setItem("token", res.token);
       setMustChange(false);
