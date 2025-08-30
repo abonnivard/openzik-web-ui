@@ -39,6 +39,7 @@ import {
   apiUploadPlaylistImage,
   apiRemovePlaylistImage
 } from "../api";
+import { safeSetItem, safeGetItem, safeRemoveItem } from "../utils/storage";
 
 // ---------------- Utils ----------------
 export async function playTrack(track) {
@@ -88,6 +89,7 @@ export function MarqueeText({ text }) {
           display: "inline-block",
           whiteSpace: "nowrap",
           color: "#fff",
+          fontSize: "0.9rem",
           animation: needsScroll ? "marquee 10s linear infinite" : "none",
         }}
       >
@@ -113,8 +115,7 @@ export default function UserPlaylists({ setToast }) {
   const [likedTracks, setLikedTracks] = useState([]);
   const [playlistTracks, setPlaylistTracks] = useState({});
   const [selectedPlaylist, setSelectedPlaylist] = useState(() => {
-    const saved = sessionStorage.getItem("selectedPlaylist");
-    return saved ? JSON.parse(saved) : null;
+    return safeGetItem("playlistsSelectedPlaylist");
   });
   const [likedTracksList, setLikedTracksList] = useState([]);
 
@@ -304,6 +305,19 @@ export default function UserPlaylists({ setToast }) {
     }
   };
 
+  // Handle play track with playlist context
+  const handlePlayTrack = async (track) => {
+    // Sauvegarder la playlist courante pour la lecture continue
+    if (selectedPlaylist && selectedPlaylist.tracks && selectedPlaylist.tracks.length > 0) {
+      const playlistForPlayer = {
+        ...selectedPlaylist,
+        tracks: selectedPlaylist.tracks
+      };
+      safeSetItem("selectedPlaylist", playlistForPlayer);
+    }
+    await playTrack(track);
+  };
+
   // Handle add to playlist
   const handleAddToPlaylist = async (playlistId, track) => {
     try {
@@ -451,10 +465,13 @@ export default function UserPlaylists({ setToast }) {
 
   // ----- Persist selected playlist -----
   useEffect(() => {
-    if (selectedPlaylist) {
-      sessionStorage.setItem("selectedPlaylist", JSON.stringify(selectedPlaylist));
+    if (selectedPlaylist && selectedPlaylist.tracks && selectedPlaylist.tracks.length > 0) {
+      safeSetItem("playlistsSelectedPlaylist", selectedPlaylist);
+      // Aussi sauvegarder pour le Player
+      safeSetItem("selectedPlaylist", selectedPlaylist);
     } else {
-      sessionStorage.removeItem("selectedPlaylist");
+      safeRemoveItem("playlistsSelectedPlaylist");
+      safeRemoveItem("selectedPlaylist");
     }
   }, [selectedPlaylist]);
 
@@ -555,7 +572,7 @@ export default function UserPlaylists({ setToast }) {
           <Avatar
             src={pl.isLikedPlaylist ? like : (pl.custom_image || pl.tracks[0]?.image || "")}
             variant="rounded"
-            sx={{ width: isMobile ? 40 : 50, height: isMobile ? 40 : 50 }}
+            sx={{ width: 48, height: 48 }}
             onClick={() => setSelectedPlaylist(pl)}
           />
           <Box sx={{ flex: 1, minWidth: 0, cursor: "pointer" }} onClick={() => setSelectedPlaylist(pl)}>
@@ -592,10 +609,11 @@ export default function UserPlaylists({ setToast }) {
                   color: "rgba(255,255,255,0.4)",
                   "&:hover": { color: "#1db954" },
                   width: isMobile ? 28 : 36,
-                  height: isMobile ? 28 : 36
+                  height: 32,
+                  padding: '6px'
                 }}
               >
-                <DeleteIcon fontSize={isMobile ? "small" : "medium"} />
+                <DeleteIcon fontSize="small" />
               </IconButton>
             )}
           </Box>
@@ -684,18 +702,18 @@ export default function UserPlaylists({ setToast }) {
                 cursor: "pointer", 
                 flex: 1, 
                 minWidth: 0 
-              }} onClick={() => playTrack(track)}>
+              }} onClick={() => handlePlayTrack(track)}>
                 <Avatar
                   variant="rounded"
                   src={track.image || ""}
                   alt={track.title || "Track"}
-                  sx={{ width: isMobile ? 36 : 48, height: isMobile ? 36 : 48, flexShrink: 0 }}
+                  sx={{ width: 48, height: 48, flexShrink: 0 }}
                 />
                 <Box sx={{ overflow: "hidden", minWidth: 0, flex: 1 }}>
                   <Typography sx={{ 
                     color: "#fff", 
                     fontWeight: 600,
-                    fontSize: isMobile ? "0.9rem" : "1rem",
+                    fontSize: "0.9rem",
                     whiteSpace: "nowrap",
                     overflow: "hidden",
                     textOverflow: "ellipsis"
@@ -704,7 +722,7 @@ export default function UserPlaylists({ setToast }) {
                   </Typography>
                   <Typography sx={{ 
                     color: "rgba(255,255,255,0.7)", 
-                    fontSize: isMobile ? "0.75rem" : "0.8rem",
+                    fontSize: "0.8rem",
                     whiteSpace: "nowrap",
                     overflow: "hidden",
                     textOverflow: "ellipsis"
@@ -717,12 +735,12 @@ export default function UserPlaylists({ setToast }) {
               <Box sx={{ display: "flex", alignItems: "center" }}>
                 <IconButton
                   onClick={() => handleLike(track)}
-                  sx={{ color: likedTracks.includes(track.id) ? "#1db954" : "#fff", width: isMobile ? 28 : 36, height: isMobile ? 28 : 36 }}
+                  sx={{ color: likedTracks.includes(track.id) ? "#1db954" : "#fff", width: 32, height: 32, padding: '6px' }}
                 >
                   {likedTracks.includes(track.id) ? (
-                    <FavoriteIcon fontSize={isMobile ? "small" : "medium"} />
+                    <FavoriteIcon fontSize="small" />
                   ) : (
-                    <FavoriteBorderIcon fontSize={isMobile ? "small" : "medium"} />
+                    <FavoriteBorderIcon fontSize="small" />
                   )}
                 </IconButton>
 
@@ -739,11 +757,12 @@ export default function UserPlaylists({ setToast }) {
                     sx={{
                       color: "rgba(255,255,255,0.6)",
                       "&:hover": { color: "#ff4d4d" },
-                      width: isMobile ? 28 : 36,
-                      height: isMobile ? 28 : 36
+                      width: 32,
+                      height: 32,
+                      padding: '6px'
                     }}
                   >
-                    <DeleteIcon fontSize={isMobile ? "small" : "medium"} />
+                    <DeleteIcon fontSize="small" />
                   </IconButton>
                 )}
 
@@ -752,7 +771,7 @@ export default function UserPlaylists({ setToast }) {
 
                 <TrackMenu
                   track={track}
-                  onPlay={playTrack}
+                  onPlay={handlePlayTrack}
                   onToggleLike={handleLike}
                   onAddToQueue={(track) => addToQueue(track, setToast)}
                   showPlayOption={false} // Can already click on track

@@ -10,7 +10,14 @@ const config: CapacitorConfig = {
     hostname: 'localhost',
     // Permet à l'app iOS de faire des requêtes vers le backend local
     androidScheme: 'https',
-    iosScheme: 'capacitor'
+    iosScheme: 'capacitor',
+    // Autoriser les domaines externes et IP privées
+    allowNavigation: [
+      'http://192.168.*',
+      'http://100.64.*',
+      'https://192.168.*',
+      'https://100.64.*'
+    ]
   },
   ios: {
     scheme: 'OpenZik'

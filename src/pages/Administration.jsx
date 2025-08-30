@@ -34,9 +34,7 @@ import {
   Group,
   MusicNote,
   Album,
-  QueueMusic,
-  Storage,
-  Settings
+  QueueMusic
 } from "@mui/icons-material";
 import {
   apiGetAllUsers,
@@ -45,16 +43,11 @@ import {
   apiDeleteUser,
   apiGetAdminStats
 } from "../api";
-import { hasOfflineSupport } from '../utils/platform';
-import configService from '../services/configService';
 
 export default function Administration({ setToast }) {
   const [users, setUsers] = useState([]);
   const [stats, setStats] = useState({ users: 0, tracks: 0, albums: 0, playlists: 0 });
   const [loading, setLoading] = useState(true);
-  const [serverConfigDialog, setServerConfigDialog] = useState(false);
-  const [newServerUrl, setNewServerUrl] = useState("");
-  const [currentServerUrl, setCurrentServerUrl] = useState("");
   const [openDialog, setOpenDialog] = useState(false);
   const [editingUser, setEditingUser] = useState(null);
   const [formData, setFormData] = useState({
@@ -105,11 +98,6 @@ export default function Administration({ setToast }) {
 
   useEffect(() => {
     loadData();
-    
-    // Charger l'URL du serveur actuelle si on est sur iOS
-    if (hasOfflineSupport()) {
-      setCurrentServerUrl(configService.getServerUrl());
-    }
   }, []);
 
   const handleCreateUser = () => {
@@ -188,39 +176,6 @@ export default function Administration({ setToast }) {
     });
   };
 
-  // Fonctions pour la configuration du serveur (iOS uniquement)
-  const handleServerConfigOpen = () => {
-    setNewServerUrl(currentServerUrl);
-    setServerConfigDialog(true);
-  };
-
-  const handleServerConfigSave = async () => {
-    if (!newServerUrl.trim()) {
-      setToast({ message: "Please enter a server URL", severity: "error" });
-      return;
-    }
-
-    try {
-      const result = await configService.testConnection(newServerUrl.trim());
-      
-      if (result.success) {
-        configService.setServerUrl(newServerUrl.trim());
-        setCurrentServerUrl(newServerUrl.trim());
-        setServerConfigDialog(false);
-        setToast({ message: "Server configuration updated successfully ✅", severity: "success" });
-        
-        // Recharger l'app après changement de serveur
-        setTimeout(() => {
-          window.location.reload();
-        }, 1000);
-      } else {
-        setToast({ message: `Connection failed: ${result.message}`, severity: "error" });
-      }
-    } catch (error) {
-      setToast({ message: `Connection failed: ${error.message}`, severity: "error" });
-    }
-  };
-
   if (loading) {
     return (
       <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", height: "50vh" }}>
@@ -293,61 +248,6 @@ export default function Administration({ setToast }) {
           </Grid>
         ))}
       </Grid>
-
-      {/* Server Configuration - iOS Only */}
-      {hasOfflineSupport() && (
-        <Card
-          sx={{
-            bgcolor: "rgba(255,255,255,0.05)",
-            borderRadius: 3,
-            border: "1px solid rgba(255,255,255,0.1)",
-            backdropFilter: "blur(10px)"
-          }}
-        >
-          <CardContent>
-            <Box sx={{ display: "flex", alignItems: "center", mb: 3 }}>
-              <Storage sx={{ color: "#1db954", mr: 2 }} />
-              <Typography variant="h6" sx={{ color: "#fff", fontWeight: 600 }}>
-                Server Configuration
-              </Typography>
-            </Box>
-
-            <Alert 
-              severity="info" 
-              sx={{ 
-                mb: 3,
-                bgcolor: 'rgba(29,185,84,0.1)',
-                border: '1px solid rgba(29,185,84,0.3)',
-                color: '#fff',
-                '& .MuiAlert-icon': { color: '#1db954' }
-              }}
-            >
-              Current server: {currentServerUrl}
-            </Alert>
-
-            <Box sx={{ display: "flex", justifyContent: "flex-end" }}>
-              <Button
-                variant="outlined"
-                startIcon={<Settings />}
-                onClick={handleServerConfigOpen}
-                sx={{
-                  borderColor: "#1db954",
-                  color: "#1db954",
-                  "&:hover": { 
-                    borderColor: "#1ed760",
-                    color: "#1ed760",
-                    bgcolor: "rgba(29,185,84,0.05)"
-                  },
-                  fontWeight: 600,
-                  px: 4
-                }}
-              >
-                Change Server
-              </Button>
-            </Box>
-          </CardContent>
-        </Card>
-      )}
 
       {/* Users Table */}
       <Card
@@ -572,89 +472,6 @@ export default function Administration({ setToast }) {
           </Button>
         </DialogActions>
       </Dialog>
-
-      {/* Server Configuration Dialog - iOS Only */}
-      {hasOfflineSupport() && (
-        <Dialog 
-          open={serverConfigDialog} 
-          onClose={() => setServerConfigDialog(false)}
-          maxWidth="sm"
-          fullWidth
-          PaperProps={{
-            sx: {
-              bgcolor: '#121212',
-              backgroundImage: 'none',
-              color: 'white',
-              borderRadius: 3,
-              border: '1px solid #333'
-            }
-          }}
-        >
-          <DialogTitle sx={{ 
-            display: 'flex', 
-            alignItems: 'center', 
-            gap: 1,
-            color: '#fff',
-            borderBottom: '1px solid #333',
-            pb: 2
-          }}>
-            <Storage sx={{ color: '#1db954' }} />
-            Change Server Configuration
-          </DialogTitle>
-          
-          <DialogContent sx={{ py: 3 }}>
-            <Typography variant="body2" sx={{ color: '#b3b3b3', mb: 3 }}>
-              Enter the new server URL. The app will reload after successful connection.
-            </Typography>
-            
-            <TextField
-              fullWidth
-              label="Server URL"
-              placeholder="http://192.168.1.100:3000"
-              value={newServerUrl}
-              onChange={(e) => setNewServerUrl(e.target.value)}
-              sx={{
-                '& .MuiOutlinedInput-root': {
-                  bgcolor: '#1a1a1a',
-                  color: '#fff',
-                  '& fieldset': { borderColor: '#333' },
-                  '&:hover fieldset': { borderColor: '#555' },
-                  '&.Mui-focused fieldset': { borderColor: '#1db954' },
-                },
-                '& .MuiInputLabel-root': { color: '#b3b3b3' },
-                '& .MuiInputLabel-root.Mui-focused': { color: '#1db954' },
-              }}
-            />
-          </DialogContent>
-
-          <DialogActions sx={{ p: 3, borderTop: '1px solid #333' }}>
-            <Button 
-              onClick={() => setServerConfigDialog(false)}
-              sx={{
-                color: '#b3b3b3',
-                '&:hover': { color: '#fff', bgcolor: 'rgba(255,255,255,0.05)' }
-              }}
-            >
-              Cancel
-            </Button>
-            <Button 
-              onClick={handleServerConfigSave}
-              variant="contained"
-              startIcon={<Storage />}
-              sx={{
-                bgcolor: '#1db954',
-                color: 'white',
-                '&:hover': { bgcolor: '#1ed760' },
-                borderRadius: 2,
-                textTransform: 'none',
-                fontWeight: 600
-              }}
-            >
-              Test & Save
-            </Button>
-          </DialogActions>
-        </Dialog>
-      )}
     </Box>
   );
 }

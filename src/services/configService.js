@@ -63,13 +63,18 @@ class ConfigService {
     try {
       const cleanUrl = url.replace(/\/$/, '');
       
-      // Créer une promesse avec timeout
+      // Créer une promesse avec timeout plus long pour VPN
       const timeoutPromise = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error('Connection timeout')), 5000)
+        setTimeout(() => reject(new Error('Connection timeout')), 10000)
       );
       
       const fetchPromise = fetch(`${cleanUrl}/health`, {
-        method: 'GET'
+        method: 'GET',
+        mode: 'cors',
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json'
+        }
       });
       
       const response = await Promise.race([fetchPromise, timeoutPromise]);
@@ -80,6 +85,7 @@ class ConfigService {
         return { success: false, message: `Server responded with ${response.status}` };
       }
     } catch (error) {
+      console.error('Connection test error:', error);
       return { 
         success: false, 
         message: error.message || 'Connection failed' 

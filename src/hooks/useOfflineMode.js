@@ -1,10 +1,37 @@
 import { useState, useEffect } from 'react';
 import { hasOfflineSupport } from '../utils/platform';
 import authStorage from '../services/authStorage';
+import configService from '../services/configService';
 
 export const useOfflineMode = () => {
   const [isOfflineMode, setIsOfflineMode] = useState(false);
-  const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const [isServerReachable, setIsServerReachable] = useState(true);
+  const [lastServerCheck, setLastServerCheck] = useState(null);
+
+  // Fonction pour tester la connectivité au serveur
+  const checkServerConnectivity = async () => {
+    try {
+      const serverUrl = configService.getServerUrl();
+      const result = await configService.testConnection(serverUrl);
+      const reachable = result.success;
+      
+      setIsServerReachable(reachable);
+      setLastServerCheck(new Date());
+      
+      console.log('Server connectivity check:', {
+        serverUrl,
+        reachable,
+        message: result.message
+      });
+      
+      return reachable;
+    } catch (error) {
+      console.error('Error checking server connectivity:', error);
+      setIsServerReachable(false);
+      setLastServerCheck(new Date());
+      return false;
+    }
+  };
 
   useEffect(() => {
     // Charger le mode offline depuis le localStorage
@@ -13,18 +40,22 @@ export const useOfflineMode = () => {
       setIsOfflineMode(true);
     }
 
-    // Écouter les changements de statut réseau
-    const handleOnline = () => setIsOnline(true);
-    const handleOffline = () => setIsOnline(false);
+    // Vérifier la connectivité du serveur au démarrage
+    if (!isOfflineMode) {
+      checkServerConnectivity();
+    }
 
-    window.addEventListener('online', handleOnline);
-    window.addEventListener('offline', handleOffline);
+    // Vérifier périodiquement la connectivité du serveur (toutes les 30 secondes)
+    const interval = setInterval(() => {
+      if (!isOfflineMode) {
+        checkServerConnectivity();
+      }
+    }, 30000);
 
     return () => {
-      window.removeEventListener('online', handleOnline);
-      window.removeEventListener('offline', handleOffline);
+      clearInterval(interval);
     };
-  }, []);
+  }, [isOfflineMode]);
 
   const enableOfflineMode = () => {
     if (hasOfflineSupport()) {
@@ -40,18 +71,24 @@ export const useOfflineMode = () => {
   const disableOfflineMode = () => {
     setIsOfflineMode(false);
     localStorage.removeItem('forceOfflineMode');
+    // Vérifier immédiatement la connectivité du serveur
+    checkServerConnectivity();
     window.dispatchEvent(new CustomEvent('offline-mode-changed', { detail: false }));
   };
 
-  // Mode offline forcé OU pas de connexion réseau
-  const shouldUseOfflineMode = isOfflineMode || !isOnline;
+  // Mode offline forcé OU serveur inaccessible (mais permettre le changement de serveur)
+  const shouldUseOfflineMode = isOfflineMode || !isServerReachable;
 
   return {
     isOfflineMode,
-    isOnline,
+    isServerReachable,
+    lastServerCheck,
     shouldUseOfflineMode,
     enableOfflineMode,
     disableOfflineMode,
-    canGoOffline: hasOfflineSupport()
+    checkServerConnectivity,
+    canGoOffline: hasOfflineSupport(),
+    // Compatibilité avec l'ancien code qui utilise isOnline
+    isOnline: isServerReachable
   };
 };

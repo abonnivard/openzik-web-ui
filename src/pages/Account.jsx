@@ -7,16 +7,37 @@ import {
   Card, 
   CardContent, 
   Grid, 
-  IconButton
+  IconButton,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Alert,
+  Chip,
+  CircularProgress
 } from "@mui/material";
-import { Person, Lock, Edit } from "@mui/icons-material";
+import { Person, Lock, Edit, Storage, Settings, NetworkCheck } from "@mui/icons-material";
 import { apiGetUserInfo, apiUpdateUserInfo, apiChangePassword, apiUploadProfileImage, apiRemoveProfileImage } from "./../api";
 import ImageUploader from "../components/ImageUploader";
+import { hasOfflineSupport } from '../utils/platform';
+import configService from '../services/configService';
+import NetworkDiagnostic from '../utils/networkDiagnostic';
+import { useOfflineMode } from '../hooks/useOfflineMode';
 
 export default function Account({ setToast }) {
   const [user, setUser] = useState({ username: "", first_name: "", last_name: "", profile_image: null });
   const [passwords, setPasswords] = useState({ current: "", new: "", confirm: "" });
   const [editMode, setEditMode] = useState(false);
+  
+  // Hook pour le mode offline et la connectivité serveur
+  const { isServerReachable, checkServerConnectivity } = useOfflineMode();
+  
+  // États pour la configuration du serveur
+  const [serverConfigDialog, setServerConfigDialog] = useState(false);
+  const [newServerUrl, setNewServerUrl] = useState("");
+  const [currentServerUrl, setCurrentServerUrl] = useState("");
+  const [diagnosticResults, setDiagnosticResults] = useState(null);
+  const [runningDiagnostic, setRunningDiagnostic] = useState(false);
 
   useEffect(() => {
     async function fetchUser() {
@@ -29,6 +50,11 @@ export default function Account({ setToast }) {
     }
     
     fetchUser();
+    
+    // Charger l'URL du serveur actuelle si on est sur iOS
+    if (hasOfflineSupport()) {
+      setCurrentServerUrl(configService.getServerUrl());
+    }
   }, [setToast]);
 
   const handleUpdateInfo = async () => {
@@ -74,6 +100,73 @@ export default function Account({ setToast }) {
     } catch (error) {
       console.error("Error removing profile image:", error);
       setToast({ message: "Error removing profile image ❌", severity: "error" });
+    }
+  };
+
+  // Fonctions pour la configuration du serveur (iOS uniquement)
+  const handleServerConfigOpen = () => {
+    setNewServerUrl(currentServerUrl);
+    setDiagnosticResults(null);
+    setServerConfigDialog(true);
+  };
+
+  const runNetworkDiagnostic = async () => {
+    if (!newServerUrl.trim()) {
+      setToast({ message: "Please enter a server URL to test", severity: "error" });
+      return;
+    }
+
+    setRunningDiagnostic(true);
+    try {
+      const results = await NetworkDiagnostic.testConnectivity(newServerUrl.trim());
+      setDiagnosticResults(results);
+      
+      const report = NetworkDiagnostic.formatResults(results);
+      console.log('Network Diagnostic Report:', report);
+      
+      // Afficher un résumé
+      const successfulTests = results.tests.filter(t => t.success).length;
+      const totalTests = results.tests.length;
+      
+      if (successfulTests === totalTests) {
+        setToast({ message: `All tests passed (${successfulTests}/${totalTests})`, severity: "success" });
+      } else if (successfulTests > 0) {
+        setToast({ message: `Some tests passed (${successfulTests}/${totalTests})`, severity: "warning" });
+      } else {
+        setToast({ message: `All tests failed (0/${totalTests})`, severity: "error" });
+      }
+    } catch (error) {
+      setToast({ message: `Diagnostic failed: ${error.message}`, severity: "error" });
+    } finally {
+      setRunningDiagnostic(false);
+    }
+  };
+
+  const handleServerConfigSave = async () => {
+    if (!newServerUrl.trim()) {
+      setToast({ message: "Please enter a server URL", severity: "error" });
+      return;
+    }
+
+    try {
+      const result = await configService.testConnection(newServerUrl.trim());
+      
+      if (result.success) {
+        configService.setServerUrl(newServerUrl.trim());
+        setCurrentServerUrl(newServerUrl.trim());
+        setServerConfigDialog(false);
+        setDiagnosticResults(null);
+        setToast({ message: "Server configuration updated successfully ✅", severity: "success" });
+        
+        // Recharger l'app après changement de serveur
+        setTimeout(() => {
+          window.location.reload();
+        }, 1000);
+      } else {
+        setToast({ message: `Connection failed: ${result.message}`, severity: "error" });
+      }
+    } catch (error) {
+      setToast({ message: `Error: ${error.message}`, severity: "error" });
     }
   };
 
@@ -373,7 +466,286 @@ export default function Account({ setToast }) {
             </CardContent>
           </Card>
         </Grid>
+
+        {/* Server Configuration - iOS Only */}
+        {hasOfflineSupport() && (
+          <Grid item xs={12}>
+            <Card sx={{ bgcolor: "#1a1a1a", border: "1px solid #333" }}>
+              <CardContent sx={{ p: 3 }}>
+                <Box sx={{ display: "flex", alignItems: "center", mb: 3 }}>
+                  <Storage sx={{ color: "#1db954", mr: 2 }} />
+                  <Typography variant="h6" sx={{ color: "#fff", fontWeight: 600, flex: 1 }}>
+                    Server Configuration
+                  </Typography>
+                  <Box sx={{ 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    gap: 1,
+                    px: 2,
+                    py: 0.5,
+                    bgcolor: isServerReachable ? 'rgba(76,175,80,0.1)' : 'rgba(255,152,0,0.1)',
+                    borderRadius: 1,
+                    border: `1px solid ${isServerReachable ? 'rgba(76,175,80,0.3)' : 'rgba(255,152,0,0.3)'}`
+                  }}>
+                    <Box sx={{ 
+                      width: 8, 
+                      height: 8, 
+                      borderRadius: '50%', 
+                      bgcolor: isServerReachable ? '#4caf50' : '#ff9800' 
+                    }} />
+                    <Typography variant="caption" sx={{ 
+                      color: isServerReachable ? '#4caf50' : '#ff9800',
+                      fontWeight: 600
+                    }}>
+                      {isServerReachable ? 'Connected' : 'Disconnected'}
+                    </Typography>
+                  </Box>
+                </Box>
+
+                <Alert 
+                  severity={isServerReachable ? "info" : "warning"}
+                  sx={{ 
+                    mb: 3,
+                    bgcolor: isServerReachable 
+                      ? 'rgba(29,185,84,0.1)' 
+                      : 'rgba(255,152,0,0.1)',
+                    border: `1px solid ${isServerReachable 
+                      ? 'rgba(29,185,84,0.3)' 
+                      : 'rgba(255,152,0,0.3)'}`,
+                    color: '#fff',
+                    '& .MuiAlert-icon': { 
+                      color: isServerReachable ? '#1db954' : '#ff9800' 
+                    }
+                  }}
+                >
+                  Current server: {currentServerUrl}
+                  {!isServerReachable && (
+                    <Typography variant="body2" sx={{ mt: 1, opacity: 0.8 }}>
+                      Server is currently unreachable. You can still change server configuration.
+                    </Typography>
+                  )}
+                </Alert>
+
+                <Box sx={{ display: "flex", gap: 2, flexDirection: { xs: 'column', sm: 'row' } }}>
+                  <Button
+                    variant="outlined"
+                    startIcon={<NetworkCheck />}
+                    onClick={checkServerConnectivity}
+                    sx={{
+                      borderColor: "#ff9800",
+                      color: "#ff9800",
+                      "&:hover": { 
+                        borderColor: "#ffa726",
+                        color: "#ffa726",
+                        bgcolor: "rgba(255,152,0,0.1)"
+                      },
+                      fontWeight: 600,
+                      px: 3,
+                      flex: { xs: 1, sm: 'none' }
+                    }}
+                  >
+                    Test Connection
+                  </Button>
+                  <Button
+                    variant="outlined"
+                    startIcon={<Settings />}
+                    onClick={handleServerConfigOpen}
+                    sx={{
+                      borderColor: "#1db954",
+                      color: "#1db954",
+                      "&:hover": { 
+                        borderColor: "#1ed760",
+                        color: "#1ed760",
+                        bgcolor: "rgba(29,185,84,0.1)"
+                      },
+                      fontWeight: 600,
+                      px: 3,
+                      flex: { xs: 1, sm: 'none' }
+                    }}
+                  >
+                    Change Server
+                  </Button>
+                </Box>
+              </CardContent>
+            </Card>
+          </Grid>
+        )}
       </Grid>
+
+      {/* Server Configuration Dialog - iOS Only */}
+      {hasOfflineSupport() && (
+        <Dialog
+          open={serverConfigDialog}
+          onClose={() => setServerConfigDialog(false)}
+          maxWidth="sm"
+          fullWidth
+          sx={{
+            '& .MuiDialog-paper': {
+              bgcolor: '#1a1a1a',
+              color: 'white',
+              borderRadius: 3,
+              border: '1px solid #333'
+            }
+          }}
+        >
+          <DialogTitle sx={{ 
+            display: 'flex', 
+            alignItems: 'center', 
+            gap: 1,
+            color: '#fff',
+            borderBottom: '1px solid #333',
+            pb: 2
+          }}>
+            <Storage sx={{ color: '#1db954' }} />
+            Change Server Configuration
+          </DialogTitle>
+          
+          <DialogContent sx={{ py: 3 }}>
+            <Typography variant="body2" sx={{ color: '#b3b3b3', mb: 1 }}>
+              Enter the new server URL. The app will reload after successful connection.
+            </Typography>
+            
+            {!isServerReachable && (
+              <Alert 
+                severity="info" 
+                sx={{ 
+                  mb: 3,
+                  bgcolor: 'rgba(33,150,243,0.1)',
+                  border: '1px solid rgba(33,150,243,0.3)',
+                  color: '#fff',
+                  '& .MuiAlert-icon': { color: '#2196f3' }
+                }}
+              >
+                Current server is unreachable. You can change to a different server.
+              </Alert>
+            )}
+            
+            
+            <TextField
+              fullWidth
+              label="Server URL"
+              placeholder="http://192.168.1.100:3000"
+              value={newServerUrl}
+              onChange={(e) => setNewServerUrl(e.target.value)}
+              sx={{
+                '& .MuiOutlinedInput-root': {
+                  bgcolor: '#1a1a1a',
+                  color: '#fff',
+                  '& fieldset': { borderColor: '#333' },
+                  '&:hover fieldset': { borderColor: '#555' },
+                  '&.Mui-focused fieldset': { borderColor: '#1db954' },
+                },
+                '& .MuiInputLabel-root': { color: '#b3b3b3' },
+                '& .MuiInputLabel-root.Mui-focused': { color: '#1db954' },
+              }}
+            />
+            
+            {diagnosticResults && (
+              <Box sx={{ mt: 3, p: 2, bgcolor: '#1a1a1a', borderRadius: 2, border: '1px solid #333' }}>
+                <Typography variant="h6" sx={{ color: '#fff', mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <NetworkCheck sx={{ color: '#ffb74d' }} />
+                  Diagnostic Results
+                </Typography>
+                
+                {diagnosticResults.tests.map((test, index) => (
+                  <Box key={index} sx={{ mb: 1, display: 'flex', alignItems: 'center', gap: 2 }}>
+                    <Typography sx={{ color: test.success ? '#4caf50' : '#f44336', minWidth: '20px' }}>
+                      {test.success ? '✅' : '❌'}
+                    </Typography>
+                    <Typography sx={{ color: '#fff', flex: 1 }}>
+                      {test.name}
+                    </Typography>
+                    {test.status && (
+                      <Chip 
+                        label={test.status} 
+                        size="small" 
+                        sx={{ 
+                          bgcolor: test.success ? 'rgba(76,175,80,0.2)' : 'rgba(244,67,54,0.2)',
+                          color: test.success ? '#4caf50' : '#f44336',
+                          fontSize: '0.75rem'
+                        }} 
+                      />
+                    )}
+                  </Box>
+                ))}
+                
+                <Typography variant="caption" sx={{ color: '#b3b3b3', mt: 2, display: 'block' }}>
+                  Check console for detailed report
+                </Typography>
+              </Box>
+            )}
+          </DialogContent>
+
+          <DialogActions 
+            sx={{ 
+              p: 3, 
+              borderTop: '1px solid #333',
+              flexDirection: 'column',
+              gap: 2,
+              alignItems: 'stretch'
+            }}
+          >
+            {/* Bouton diagnostic au-dessus */}
+            <Button 
+              onClick={runNetworkDiagnostic}
+              disabled={runningDiagnostic}
+              startIcon={runningDiagnostic ? <CircularProgress size={16} sx={{ color: '#fff' }} /> : <NetworkCheck />}
+              fullWidth
+              variant="outlined"
+              sx={{
+                color: '#ffb74d',
+                borderColor: '#ffb74d',
+                '&:hover': { borderColor: '#ffa726', bgcolor: 'rgba(255,183,77,0.1)' },
+                borderRadius: 2,
+                textTransform: 'none',
+                fontWeight: 600,
+                py: 1.5
+              }}
+            >
+              {runningDiagnostic ? 'Testing...' : 'Run Network Diagnostic'}
+            </Button>
+            
+            {/* Boutons d'action en bas */}
+            <Box sx={{ 
+              display: 'flex', 
+              gap: 2,
+              flexDirection: { xs: 'column', sm: 'row' },
+              width: '100%'
+            }}>
+              <Button 
+                onClick={() => setServerConfigDialog(false)}
+                fullWidth
+                sx={{
+                  color: '#b3b3b3',
+                  '&:hover': { color: '#fff', bgcolor: 'rgba(255,255,255,0.05)' },
+                  py: 1.5,
+                  order: { xs: 2, sm: 1 }
+                }}
+              >
+                Cancel
+              </Button>
+              <Button 
+                onClick={handleServerConfigSave}
+                variant="contained"
+                startIcon={<Storage />}
+                fullWidth
+                sx={{
+                  bgcolor: '#1db954',
+                  color: 'white',
+                  '&:hover': { bgcolor: '#1ed760' },
+                  borderRadius: 2,
+                  textTransform: 'none',
+                  fontWeight: 600,
+                  py: 1.5,
+                  order: { xs: 1, sm: 2 }
+                }}
+              >
+                Test & Save
+              </Button>
+            </Box>
+          </DialogActions>
+        </Dialog>
+      )}
     </Box>
   );
 }

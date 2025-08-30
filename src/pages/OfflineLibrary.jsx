@@ -22,19 +22,65 @@ import offlineDownloadService from '../services/offlineDownload';
 import TrackMenu from '../components/TrackMenu';
 import PlaylistMenu from '../components/PlaylistMenu';
 
-// Function pour lire une track
+// Function pour lire une track depuis un fichier local téléchargé
 async function playTrack(track) {
-  sessionStorage.setItem("currentTrack", JSON.stringify(track));
-  sessionStorage.setItem("isPlaying", JSON.stringify(true));
-  window.dispatchEvent(new Event("storage"));
+  try {
+    // Récupérer l'URI du fichier local téléchargé
+    const localUri = await offlineDownloadService.getOfflineTrackUri(track.id);
+    
+    if (!localUri) {
+      console.error('No local file found for track:', track.title);
+      return;
+    }
+    
+    // Créer une copie de la track avec l'URI locale
+    const localTrack = {
+      ...track,
+      url: localUri, // Utiliser l'URI du fichier local
+      isOffline: true
+    };
+    
+    console.log('Playing offline track:', localTrack.title, 'from:', localUri);
+    
+    sessionStorage.setItem("currentTrack", JSON.stringify(localTrack));
+    sessionStorage.setItem("isPlaying", JSON.stringify(true));
+    window.dispatchEvent(new Event("storage"));
+  } catch (error) {
+    console.error('Error playing offline track:', error);
+  }
 }
 
-// Function to add to queue
-function addToQueue(track, setToast) {
+// Function to add to queue (avec support des fichiers locaux)
+async function addToQueue(track, setToast) {
   if (window.addToQueue) {
-    window.addToQueue(track);
-    if (setToast) {
-      setToast({ message: `"${track.title}" added to queue`, severity: "success" });
+    try {
+      // Récupérer l'URI du fichier local téléchargé
+      const localUri = await offlineDownloadService.getOfflineTrackUri(track.id);
+      
+      if (!localUri) {
+        console.error('No local file found for track:', track.title);
+        if (setToast) {
+          setToast({ message: "Local file not found", severity: "error" });
+        }
+        return;
+      }
+      
+      // Créer une copie de la track avec l'URI locale
+      const localTrack = {
+        ...track,
+        url: localUri, // Utiliser l'URI du fichier local
+        isOffline: true
+      };
+      
+      window.addToQueue(localTrack);
+      if (setToast) {
+        setToast({ message: `"${track.title}" added to queue`, severity: "success" });
+      }
+    } catch (error) {
+      console.error('Error adding offline track to queue:', error);
+      if (setToast) {
+        setToast({ message: "Error adding track to queue", severity: "error" });
+      }
     }
   } else {
     console.warn("Player queue system not available");
@@ -63,6 +109,7 @@ function MarqueeText({ text }) {
           display: "inline-block",
           whiteSpace: "nowrap",
           color: "#fff",
+          fontSize: "0.9rem",
           animation: needsScroll ? "marquee 10s linear infinite" : "none",
         }}
       >
@@ -185,14 +232,18 @@ const OfflineLibrary = ({ setToast }) => {
         <Box sx={{ display: 'flex', alignItems: 'center', p: 2 }}>
           <Avatar
             src={track.albumArt || track.image}
-            sx={{ width: 56, height: 56, mr: 2, borderRadius: 1 }}
+            sx={{ width: 48, height: 48, mr: 2, borderRadius: 1 }}
           >
             <WifiOff />
           </Avatar>
           
           <Box sx={{ flex: 1, minWidth: 0 }}>
             <MarqueeText text={track.title || 'Unknown Title'} />
-            <Typography variant="body2" sx={{ color: '#b3b3b3', mt: 0.5 }}>
+            <Typography variant="body2" sx={{ 
+              color: '#b3b3b3', 
+              mt: 0.5,
+              fontSize: "0.8rem"
+            }}>
               {track.artist || 'Unknown Artist'} • {track.album || 'Unknown Album'}
             </Typography>
           </Box>
@@ -202,15 +253,19 @@ const OfflineLibrary = ({ setToast }) => {
               e.stopPropagation();
               toggleLike(track);
             }}
-            sx={{ color: isTrackLiked(track.id) ? '#ff6b6b' : '#b3b3b3', mr: 1 }}
+            sx={{ 
+              color: isTrackLiked(track.id) ? '#ff6b6b' : '#b3b3b3', 
+              mr: 1,
+              padding: '6px'
+            }}
           >
-            {isTrackLiked(track.id) ? <FavoriteIcon /> : <FavoriteBorderIcon />}
+            {isTrackLiked(track.id) ? <FavoriteIcon fontSize="small" /> : <FavoriteBorderIcon fontSize="small" />}
           </IconButton>
 
           <TrackMenu
             track={track}
             onPlay={() => playTrack(track)}
-            onAddToQueue={() => addToQueue(track, setToast)}
+            onAddToQueue={async () => await addToQueue(track, setToast)}
             isOffline={true}
             showPlayOption={false}
           />
@@ -234,16 +289,23 @@ const OfflineLibrary = ({ setToast }) => {
         <Box sx={{ display: 'flex', alignItems: 'center', p: 2 }}>
           <Avatar
             src={playlist.image}
-            sx={{ width: 56, height: 56, mr: 2, borderRadius: 1 }}
+            sx={{ width: 48, height: 48, mr: 2, borderRadius: 1 }}
           >
             <WifiOff />
           </Avatar>
           
           <Box sx={{ flex: 1, minWidth: 0 }}>
-            <Typography variant="h6" sx={{ color: '#fff' }}>
+            <Typography variant="subtitle1" sx={{ 
+              color: '#fff',
+              fontSize: "0.9rem"
+            }}>
               {playlist.name}
             </Typography>
-            <Typography variant="body2" sx={{ color: '#b3b3b3', mt: 0.5 }}>
+            <Typography variant="body2" sx={{ 
+              color: '#b3b3b3', 
+              mt: 0.5,
+              fontSize: "0.8rem"
+            }}>
               {playlist.trackCount || 0} tracks • Offline
             </Typography>
           </Box>
@@ -394,15 +456,21 @@ const OfflineLibrary = ({ setToast }) => {
                   <Box sx={{ display: 'flex', alignItems: 'center', p: 2 }}>
                     <Avatar
                       src={tracksByArtist[artist][0]?.albumArt || tracksByArtist[artist][0]?.image}
-                      sx={{ width: 56, height: 56, mr: 2 }}
+                      sx={{ width: 48, height: 48, mr: 2 }}
                     >
                       <WifiOff />
                     </Avatar>
                     <Box sx={{ flex: 1 }}>
-                      <Typography variant="h6" sx={{ color: '#fff' }}>
+                      <Typography variant="subtitle1" sx={{ 
+                        color: '#fff',
+                        fontSize: "0.9rem"
+                      }}>
                         {artist}
                       </Typography>
-                      <Typography variant="body2" sx={{ color: '#b3b3b3' }}>
+                      <Typography variant="body2" sx={{ 
+                        color: '#b3b3b3',
+                        fontSize: "0.8rem"
+                      }}>
                         {tracksByArtist[artist].length} tracks
                       </Typography>
                     </Box>

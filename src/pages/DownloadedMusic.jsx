@@ -51,11 +51,6 @@ const DownloadedMusic = ({ setToast }) => {
     }
   };
 
-  const playTrack = (track) => {
-    sessionStorage.setItem("currentTrack", JSON.stringify(track));
-    sessionStorage.setItem("isPlaying", JSON.stringify(true));
-    window.dispatchEvent(new Event("storage"));
-  };
 
   const deleteTrack = async (trackId) => {
     try {
@@ -154,7 +149,6 @@ const DownloadedMusic = ({ setToast }) => {
           {downloadedTracks.map((track, index) => (
             <Paper
               key={track.id}
-              onClick={() => playTrack(track)}
               sx={{
                 marginBottom: 1,
                 bgcolor: 'rgba(255,255,255,0.05)',
@@ -171,34 +165,46 @@ const DownloadedMusic = ({ setToast }) => {
               <Box sx={{ display: 'flex', alignItems: 'center', p: 2 }}>
                 <Avatar
                   src={track.image}
-                  sx={{ width: 56, height: 56, mr: 2, borderRadius: 1 }}
+                  sx={{ width: 48, height: 48, mr: 2, borderRadius: 1 }}
                 >
                   <MusicNote />
                 </Avatar>
                 
                 <Box sx={{ flex: 1, minWidth: 0 }}>
-                  <Typography variant="h6" sx={{ color: '#fff', fontWeight: 500 }}>
+                  <Typography variant="subtitle1" sx={{ 
+                    color: '#fff', 
+                    fontWeight: 500,
+                    fontSize: "0.9rem"
+                  }}>
                     {track.title}
                   </Typography>
-                  <Typography variant="body2" sx={{ color: '#b3b3b3', mt: 0.5 }}>
+                  <Typography variant="body2" sx={{ 
+                    color: '#b3b3b3', 
+                    mt: 0.5,
+                    fontSize: "0.8rem"
+                  }}>
                     {track.artist} • {track.album}
                   </Typography>
-                  <Typography variant="caption" sx={{ color: '#666', mt: 0.5, display: 'block' }}>
+                  <Typography variant="caption" sx={{ 
+                    color: '#666', 
+                    mt: 0.5, 
+                    display: 'block',
+                    fontSize: "0.7rem"
+                  }}>
                     {formatFileSize(track.fileSize || 0)}
                   </Typography>
-                </Box>
-
-                <IconButton
+                </Box>                <IconButton
                   onClick={(e) => {
                     e.stopPropagation();
                     deleteTrack(track.id);
                   }}
                   sx={{
                     color: 'rgba(255,255,255,0.6)',
-                    '&:hover': { color: '#ff6b6b', bgcolor: 'rgba(255,107,107,0.08)' }
+                    '&:hover': { color: '#ff6b6b', bgcolor: 'rgba(255,107,107,0.08)' },
+                    padding: '6px'
                   }}
                 >
-                  <DeleteIcon />
+                  <DeleteIcon fontSize="small" />
                 </IconButton>
               </Box>
             </Paper>

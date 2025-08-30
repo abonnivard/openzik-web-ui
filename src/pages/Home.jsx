@@ -35,6 +35,7 @@ import {
   apiCreatePlaylist,
 } from "../api";
 import { getFileUrl } from "../utils";
+import { safeSetItem, safeGetItem, safeRemoveItem } from "../utils/storage";
 import { useNetworkStatus } from "../hooks/useNetworkStatus";
 import TrackMenu from "../components/TrackMenu";
 import PlaylistMenu from "../components/PlaylistMenu";
@@ -61,7 +62,6 @@ function addToQueue(track, setToast) {
     if (setToast) {
       setToast({ message: `"${track.title}" added to queue`, severity: "success" });
     }
-    console.log(`Track added to queue: ${track.title}`);
   } else {
     console.warn("Player queue system not available");
     if (setToast) {
@@ -82,10 +82,12 @@ export default function Home({ setToast }) {
   const [allPlaylists, setAllPlaylists] = useState([]);
   const [likedTracks, setLikedTracks] = useState([]);
   const [selectedPlaylist, setSelectedPlaylist] = useState(() => {
-    const saved = sessionStorage.getItem("selectedPlaylist");
-    return saved ? JSON.parse(saved) : null;
+    return safeGetItem("homeSelectedPlaylist");
   });
-  const [playlistTracks, setPlaylistTracks] = useState([]);
+  const [playlistTracks, setPlaylistTracks] = useState(() => {
+    const savedPlaylist = safeGetItem("homeSelectedPlaylist");
+    return savedPlaylist?.tracks || [];
+  });
   
   // Create playlist dialog state
   const [openCreateDialog, setOpenCreateDialog] = useState(false);
@@ -351,7 +353,7 @@ export default function Home({ setToast }) {
               tracks: formattedLiked
             };
             setSelectedPlaylist(updatedSelectedPlaylist);
-            sessionStorage.setItem("selectedPlaylist", JSON.stringify(updatedSelectedPlaylist));
+            safeSetItem("homeSelectedPlaylist", updatedSelectedPlaylist);
           }
         } catch (error) {
           console.error('Error updating liked songs:', error);
@@ -378,13 +380,13 @@ export default function Home({ setToast }) {
             tracks: []
           };
           setSelectedPlaylist(updatedSelectedPlaylist);
-          sessionStorage.setItem("selectedPlaylist", JSON.stringify(updatedSelectedPlaylist));
+          safeSetItem("homeSelectedPlaylist", updatedSelectedPlaylist);
         }
       }
     };
 
     updateLikedSongsPlaylist();
-  }, [likedTracks, selectedPlaylist]);
+  }, [likedTracks]);
 
   // Recharger les tracks de la playlist sélectionnée si elle existe dans sessionStorage
   useEffect(() => {
@@ -433,7 +435,6 @@ export default function Home({ setToast }) {
   useEffect(() => {
     const loadPlaylistTracks = async () => {
       if (selectedPlaylist) {
-        console.log("Loading tracks for selected playlist:", selectedPlaylist);
         if (selectedPlaylist.isLikedPlaylist) {
           try {
             const likedData = await apiGetLikedTracks();
@@ -460,7 +461,6 @@ export default function Home({ setToast }) {
           }
         }
       } else {
-        console.log("No playlist selected, clearing tracks");
         setPlaylistTracks([]);
       }
     };
@@ -469,11 +469,18 @@ export default function Home({ setToast }) {
   }, [selectedPlaylist]); // Se déclencher uniquement quand selectedPlaylist change
 
   const handlePlayTrack = async (track) => {
+    // Sauvegarder la playlist courante pour la lecture continue
+    if (selectedPlaylist && playlistTracks.length > 0) {
+      const playlistForPlayer = {
+        ...selectedPlaylist,
+        tracks: playlistTracks
+      };
+      safeSetItem("selectedPlaylist", playlistForPlayer);
+    }
     await playTrack(track);
   };
 
   const handlePlaylistClick = async (playlist) => {
-    console.log('Playlist clicked:', playlist);
     setSelectedPlaylist(playlist);
     if (playlist.isLikedPlaylist) {
       // Utiliser les tracks déjà chargés pour Liked Songs
@@ -505,25 +512,31 @@ export default function Home({ setToast }) {
   };
 
   const handleBackToHome = () => {
-    console.log("Back to Home clicked - clearing selectedPlaylist");
-    sessionStorage.removeItem("selectedPlaylist");
     setSelectedPlaylist(null);
     setPlaylistTracks([]);
+    safeRemoveItem("homeSelectedPlaylist");
+    safeRemoveItem("selectedPlaylist");
+    
+    setTimeout(() => {
+    }, 100);
   };
 
   // Persist selected playlist in sessionStorage
   useEffect(() => {
-    if (selectedPlaylist) {
-      sessionStorage.setItem("selectedPlaylist", JSON.stringify(selectedPlaylist));
+    if (selectedPlaylist && playlistTracks.length > 0) {
+      const playlistForHome = { ...selectedPlaylist, tracks: playlistTracks };
+      safeSetItem("homeSelectedPlaylist", playlistForHome);
+      // Aussi sauvegarder pour le Player
+      safeSetItem("selectedPlaylist", playlistForHome);
     } else {
-      sessionStorage.removeItem("selectedPlaylist");
+      safeRemoveItem("homeSelectedPlaylist");
+      safeRemoveItem("selectedPlaylist");
     }
-  }, [selectedPlaylist]);
+  }, [selectedPlaylist, playlistTracks]);
 
   // Listen for playlist changes from other components
   useEffect(() => {
     const handlePlaylistsChanged = () => {
-      console.log('Playlists changed event received in Home');
       const fetchData = async () => {
         try {
           const [playlistsData, recentData, topData, artistsData, allPlaylistsData, likedData] = await Promise.all([
@@ -538,20 +551,6 @@ export default function Home({ setToast }) {
           setPlaylists(playlistsData);
           setAllPlaylists(allPlaylistsData);
           
-          // Reload playlist tracks if we're viewing a playlist
-          if (selectedPlaylist && selectedPlaylist.id !== "liked") {
-            try {
-              const playlistTracksData = await apiGetPlaylistTracks(selectedPlaylist.id);
-              const formattedTracks = playlistTracksData.map(t => ({
-                ...t,
-                url: `http://localhost:3000/${t.file_path.split(/[\\/]/).map(encodeURIComponent).join("/")}`
-              }));
-              setPlaylistTracks(formattedTracks);
-              setSelectedPlaylist(prev => ({ ...prev, tracks: formattedTracks }));
-            } catch (error) {
-              console.error(`Error loading tracks for playlist ${selectedPlaylist.id}:`, error);
-            }
-          }
         } catch (error) {
           console.error("Error fetching data:", error);
         }
@@ -564,7 +563,7 @@ export default function Home({ setToast }) {
     return () => {
       window.removeEventListener('playlistsChanged', handlePlaylistsChanged);
     };
-  }, [selectedPlaylist]);
+  }, []); // Removed selectedPlaylist from dependencies
 
   return (
     <Box sx={{ display: "flex", flexDirection: "column", gap: 4, pb: 12 }} >

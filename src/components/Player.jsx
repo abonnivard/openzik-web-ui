@@ -21,6 +21,7 @@ import FavoriteBorderIcon from "@mui/icons-material/FavoriteBorder";
 import { apiLikeTrack, apiUnlikeTrack, apiGetLikedTracks } from "../api";
 import { useOfflineMode } from "../hooks/useOfflineMode";
 import authStorage from "../services/authStorage";
+import { safeSetItem, safeGetItem, safeRemoveItem } from "../utils/storage";
 
 export default function Player() {
   const audioRef = useRef(null);
@@ -68,19 +69,19 @@ export default function Player() {
 
   // Load queue from sessionStorage
   useEffect(() => {
-    const savedQueue = JSON.parse(sessionStorage.getItem("musicQueue") || "[]");
+    const savedQueue = safeGetItem("musicQueue", []);
     setQueue(savedQueue);
   }, []);
 
   // Save queue to sessionStorage when it changes
   useEffect(() => {
-    sessionStorage.setItem("musicQueue", JSON.stringify(queue));
+    safeSetItem("musicQueue", queue);
   }, [queue]);
 
   // Function to add a track to queue
   const addToQueue = useCallback((track) => {
     // Include current playlist as context to return after queue
-    const currentPlaylist = JSON.parse(sessionStorage.getItem("selectedPlaylist") || "null");
+    const currentPlaylist = safeGetItem("selectedPlaylist");
     const trackWithContext = {
       ...track,
       fromPlaylist: currentPlaylist
@@ -172,11 +173,11 @@ export default function Player() {
 
   // Charger la library depuis la playlist en cours si existante
   useEffect(() => {
-    const selectedPlaylist = JSON.parse(sessionStorage.getItem("selectedPlaylist") || "null");
+    const selectedPlaylist = safeGetItem("selectedPlaylist");
     if (selectedPlaylist?.tracks) {
       setLibrary(selectedPlaylist.tracks);
     } else {
-      const lib = JSON.parse(sessionStorage.getItem("library") || "[]");
+      const lib = safeGetItem("library", []);
       setLibrary(lib);
     }
   }, []);
@@ -184,7 +185,7 @@ export default function Player() {
   // Mettre à jour la library si la playlist change
   useEffect(() => {
     const updateLibrary = () => {
-      const selectedPlaylist = JSON.parse(sessionStorage.getItem("selectedPlaylist") || "null");
+      const selectedPlaylist = safeGetItem("selectedPlaylist");
       if (selectedPlaylist?.tracks) {
         setLibrary(selectedPlaylist.tracks);
       }
@@ -196,9 +197,9 @@ export default function Player() {
   // Charger le track actuel depuis sessionStorage
   useEffect(() => {
     const updateTrack = () => {
-      const track = JSON.parse(sessionStorage.getItem("currentTrack") || "null");
+      const track = safeGetItem("currentTrack");
       setCurrentTrack(track);
-      const playing = JSON.parse(sessionStorage.getItem("isPlaying") || "false");
+      const playing = safeGetItem("isPlaying", false);
       setIsPlaying(playing);
     };
     updateTrack();
@@ -219,7 +220,7 @@ const handleNext = useCallback(() => {
     if (isLastInQueue && nextTrack.fromPlaylist) {
       console.log("Last track in queue, will restore playlist:", nextTrack.fromPlaylist.name);
       // Store the playlist to restore after this track
-      sessionStorage.setItem("playlistToRestore", JSON.stringify(nextTrack.fromPlaylist));
+      safeSetItem("playlistToRestore", nextTrack.fromPlaylist);
     }
     
     setQueue(prev => prev.slice(1)); // Remove first track from queue
@@ -230,11 +231,11 @@ const handleNext = useCallback(() => {
   }
 
   // Check if we need to restore a playlist after queue is empty
-  const playlistToRestore = JSON.parse(sessionStorage.getItem("playlistToRestore") || "null");
+  const playlistToRestore = safeGetItem("playlistToRestore");
   if (playlistToRestore) {
     console.log("Restoring playlist after queue:", playlistToRestore.name);
-    sessionStorage.setItem("selectedPlaylist", JSON.stringify(playlistToRestore));
-    sessionStorage.removeItem("playlistToRestore");
+    safeSetItem("selectedPlaylist", playlistToRestore);
+    safeRemoveItem("playlistToRestore");
     setLibrary(playlistToRestore.tracks || []);
     window.dispatchEvent(new Event("storage"));
     
@@ -303,9 +304,9 @@ const handlePrev = useCallback(() => {
   };
 
   useEffect(() => {
-    const selectedPlaylist = JSON.parse(sessionStorage.getItem("selectedPlaylist") || "null");
+    const selectedPlaylist = safeGetItem("selectedPlaylist");
     if (!selectedPlaylist) {
-      const lib = JSON.parse(sessionStorage.getItem("library") || "[]");
+      const lib = safeGetItem("library", []);
       setLibrary(lib);
     }
   }, [currentTrack]);

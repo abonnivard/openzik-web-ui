@@ -440,7 +440,7 @@ export default function Library({ setToast }) {
               </Box>
 
               {/* Boutons like + playlist */}
-              <Box sx={{ display: "flex", alignItems: "center" }}>
+              <Box sx={{ display: "flex", alignItems: "center"}}>
                 <IconButton onClick={() => handleLike(track.id)} sx={{ color: likedTracks.includes(track.id) ? "#1db954" : "#fff" }}>
                   {likedTracks.includes(track.id) ? <FavoriteIcon /> : <FavoriteBorderIcon />}
                 </IconButton>

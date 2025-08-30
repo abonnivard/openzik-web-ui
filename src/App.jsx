@@ -77,36 +77,7 @@ export default function App() {
     checkServerConfig();
   }, [shouldUseOfflineMode]);
 
-  // Récupérer le profil utilisateur
-  useEffect(() => {
-    const fetchUserProfile = async () => {
-      try {
-        // D'abord essayer de récupérer depuis le cache
-        const cachedProfile = authStorage.getUserProfile();
-        if (cachedProfile && !shouldUseOfflineMode) {
-          setUserProfile(cachedProfile);
-        }
-
-        // Puis essayer de récupérer depuis le serveur si on a un token valide
-        if (authStorage.hasValidToken() && isServerConfigured && !shouldUseOfflineMode) {
-          const profile = await apiGetUserProfile();
-          setUserProfile(profile);
-          authStorage.setUserProfile(profile);
-        }
-      } catch (error) {
-        console.error("Error fetching user profile:", error);
-        // En cas d'erreur, utiliser le profil en cache s'il existe
-        const cachedProfile = authStorage.getUserProfile();
-        if (cachedProfile) {
-          setUserProfile(cachedProfile);
-        }
-      }
-    };
-
-    if (isServerConfigured && !shouldUseOfflineMode) {
-      fetchUserProfile();
-    }
-  }, [isServerConfigured, shouldUseOfflineMode]);
+  
 
   const handleLogin = () => {
     window.location.href = "/";
