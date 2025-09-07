@@ -707,11 +707,14 @@ export default function Home({ setToast }) {
                         "&:hover": { 
                           color: likedTracks.includes(track.id) ? "#ff6b6b" : "#1db954",
                           bgcolor: likedTracks.includes(track.id) ? "rgba(255,107,107,0.1)" : "rgba(29,185,84,0.1)"
-                        }
+                        },
+                        padding: "4px",
+                        minWidth: "28px",
+                        minHeight: "28px"
                       }}
                       size="small"
                     >
-                      {likedTracks.includes(track.id) ? <Favorite fontSize="small" /> : <FavoriteBorder fontSize="small" />}
+                      {likedTracks.includes(track.id) ? <Favorite sx={{ fontSize: "1rem" }} /> : <FavoriteBorder sx={{ fontSize: "1rem" }} />}
                     </IconButton>
                   ) : (
                     <IconButton
@@ -724,21 +727,25 @@ export default function Home({ setToast }) {
                         "&:hover": { 
                           color: "#ff6b6b",
                           bgcolor: "rgba(255,107,107,0.1)"
-                        }
+                        },
+                        padding: "4px",
+                        minWidth: "28px",
+                        minHeight: "28px"
                       }}
                       size="small"
                     >
-                      <Delete fontSize="small" />
+                      <Delete sx={{ fontSize: "1rem" }} />
                     </IconButton>
                   )}
                   {/* Offline Download Button */}
-                  <OfflineDownloadButton track={track} size="small" />
+                  <OfflineDownloadButton track={track} size="small" compact={isMobile} />
                   <TrackMenu
                     track={track}
                     onPlay={handlePlayTrack}
                     onAddToQueue={(track) => addToQueue(track, setToast)}
                     showPlayOption={false} // Can already click on track
                     setToast={setToast}
+                    compact={isMobile}
                   />
                 </Box>
               </Paper>

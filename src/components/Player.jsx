@@ -207,6 +207,85 @@ export default function Player() {
     return () => window.removeEventListener("storage", updateTrack);
   }, []);
 
+  // State to track if user has interacted (required for iOS autoplay)
+  const [userHasInteracted, setUserHasInteracted] = useState(false);
+  const [isAttemptingPlay, setIsAttemptingPlay] = useState(false);
+  const playTimeoutRef = useRef(null);
+
+  // Function to attempt play with iOS-specific handling and concurrency protection
+  const attemptPlay = useCallback(async (audio) => {
+    if (!audio || isAttemptingPlay) return false;
+    
+    // Clear any pending play attempts
+    if (playTimeoutRef.current) {
+      clearTimeout(playTimeoutRef.current);
+      playTimeoutRef.current = null;
+    }
+    
+    // Prevent concurrent play attempts
+    setIsAttemptingPlay(true);
+    
+    try {
+      // Check if audio source is valid before attempting play
+      if (!audio.src || audio.src === '') {
+        console.warn("No audio source available");
+        setIsAttemptingPlay(false);
+        return false;
+      }
+
+      // Wait for any ongoing operations to complete
+      if (audio.readyState < 2) {
+        console.log("Audio not ready, waiting...");
+        setIsAttemptingPlay(false);
+        return false;
+      }
+
+      await audio.play();
+      setIsAttemptingPlay(false);
+      return true;
+    } catch (error) {
+      setIsAttemptingPlay(false);
+      const errorMessage = error.message || error.toString();
+      
+      // Handle specific iOS/Capacitor errors
+      if (errorMessage.includes('operation is not supported') || 
+          errorMessage.includes('NotSupportedError')) {
+        console.log("iOS/Capacitor audio not supported - skipping autoplay");
+        return false;
+      }
+      
+      // Handle "operation was aborted" - common in iOS when multiple play attempts
+      if (errorMessage.includes('operation was aborted') || 
+          errorMessage.includes('AbortError')) {
+        console.log("iOS autoplay blocked - user interaction required");
+        setUserHasInteracted(false);
+        return false;
+      }
+      
+      // On iOS, if autoplay is blocked, we need user interaction
+      if (error.name === 'NotAllowedError') {
+        console.log("iOS autoplay blocked - user interaction required");
+        setUserHasInteracted(false);
+        return false;
+      }
+      
+      return false;
+    }
+  }, [isAttemptingPlay]);
+
+  // Safe delayed play function
+  const delayedPlay = useCallback((audio, delay = 100) => {
+    if (playTimeoutRef.current) {
+      clearTimeout(playTimeoutRef.current);
+    }
+    
+    playTimeoutRef.current = setTimeout(() => {
+      if (!isAttemptingPlay) {
+        attemptPlay(audio);
+      }
+    }, delay);
+  }, [attemptPlay, isAttemptingPlay]);
+
 const handleNext = useCallback(() => {
   if (!currentTrack) return;
 
@@ -227,6 +306,18 @@ const handleNext = useCallback(() => {
     setCurrentTrack(nextTrack);
     sessionStorage.setItem("currentTrack", JSON.stringify(nextTrack));
     setProgress(0);
+    
+    // Ensure playback continues on iOS
+    if (isPlaying && userHasInteracted) {
+      setTimeout(async () => {
+        const audio = audioRef.current;
+        if (audio && audio.src) {
+          audio.load(); // Force reload on iOS
+          // Wait a bit more for iOS to process the new source
+          delayedPlay(audio, 150);
+        }
+      }, 100);
+    }
     return;
   }
 
@@ -245,6 +336,18 @@ const handleNext = useCallback(() => {
       setCurrentTrack(firstTrack);
       sessionStorage.setItem("currentTrack", JSON.stringify(firstTrack));
       setProgress(0);
+      
+      // Ensure playback continues on iOS
+      if (isPlaying && userHasInteracted) {
+        setTimeout(async () => {
+          const audio = audioRef.current;
+          if (audio && audio.src) {
+            audio.load(); // Force reload on iOS
+            // Wait a bit more for iOS to process the new source
+            delayedPlay(audio, 150);
+          }
+        }, 100);
+      }
       return;
     }
   }
@@ -268,10 +371,22 @@ const handleNext = useCallback(() => {
     setCurrentTrack(nextTrack);
     sessionStorage.setItem("currentTrack", JSON.stringify(nextTrack));
     setProgress(0);
+    
+    // Ensure playback continues on iOS
+    if (isPlaying && userHasInteracted) {
+      setTimeout(async () => {
+        const audio = audioRef.current;
+        if (audio && audio.src) {
+          audio.load(); // Force reload on iOS
+          // Wait a bit more for iOS to process the new source
+          delayedPlay(audio, 150);
+        }
+      }, 100);
+    }
   } else {
     setIsPlaying(false);
   }
-}, [currentTrack, library, queue, isShuffle, repeatMode]);
+}, [currentTrack, library, queue, isShuffle, repeatMode, isPlaying, userHasInteracted, attemptPlay, delayedPlay]);
 
 const handlePrev = useCallback(() => {
   if (!currentTrack || library.length === 0) return;
@@ -282,13 +397,43 @@ const handlePrev = useCallback(() => {
     setCurrentTrack(prevTrack);
     sessionStorage.setItem("currentTrack", JSON.stringify(prevTrack));
     setProgress(0);
+    
+    // Ensure playback continues on iOS
+    if (isPlaying && userHasInteracted) {
+      setTimeout(async () => {
+        const audio = audioRef.current;
+        if (audio && audio.src) {
+          audio.load(); // Force reload on iOS
+          // Wait a bit more for iOS to process the new source
+          delayedPlay(audio, 150);
+        }
+      }, 100);
+    }
   } else if (audioRef.current) {
-    audioRef.current.currentTime = 0;
+    try {
+      audioRef.current.currentTime = 0;
+    } catch (error) {
+      console.log("Reset time operation failed (iOS development mode):", error.message);
+    }
   }
-}, [currentTrack, library]);
+}, [currentTrack, library, isPlaying, userHasInteracted, attemptPlay, delayedPlay]);
 
 
-  const togglePlay = () => setIsPlaying((prev) => !prev);
+  const togglePlay = () => {
+    setUserHasInteracted(true); // Mark user interaction for iOS
+    setIsPlaying((prev) => !prev);
+  };
+
+  // Wrapper functions to ensure user interaction is marked
+  const handleNextWithInteraction = () => {
+    setUserHasInteracted(true);
+    handleNext();
+  };
+
+  const handlePrevWithInteraction = () => {
+    setUserHasInteracted(true);
+    handlePrev();
+  };
   const toggleShuffle = () => setIsShuffle((prev) => !prev);
   const toggleRepeat = () => {
     if (repeatMode === "off") setRepeatMode("all");
@@ -298,8 +443,12 @@ const handlePrev = useCallback(() => {
 
   const handleSeek = (_, value) => {
     if (audioRef.current && !isNaN(value)) {
-      audioRef.current.currentTime = value;
-      setProgress(value);
+      try {
+        audioRef.current.currentTime = value;
+        setProgress(value);
+      } catch (error) {
+        console.log("Seek operation failed (iOS development mode):", error.message);
+      }
     }
   };
 
@@ -323,37 +472,116 @@ const handlePrev = useCallback(() => {
       lastTrackRef.current = currentTrack.file_path;
       setProgress(0);
       setDuration(0);
+      
+      // Preload audio for iOS
+      audio.preload = "auto";
+      audio.load();
     }
 
-    const onLoadedMetadata = () => setDuration(audio.duration || 0);
+    const onLoadedMetadata = () => {
+      setDuration(audio.duration || 0);
+      // On iOS, sometimes we need to trigger play after metadata is loaded
+      if (isPlaying && audio.paused && userHasInteracted) {
+        // Small delay to ensure metadata is fully loaded
+        delayedPlay(audio, 50);
+      }
+    };
+    
     const onTimeUpdate = () => setProgress(audio.currentTime);
+    
     const onEnded = () => {
       if (repeatMode === "one") {
         audio.currentTime = 0;
-        audio.play();
+        if (userHasInteracted) {
+          delayedPlay(audio, 50);
+        }
       } else {
         handleNext();
       }
     };
 
+    const onCanPlayThrough = () => {
+      // iOS sometimes needs this event to properly start playback
+      if (isPlaying && audio.paused && userHasInteracted) {
+        delayedPlay(audio, 50);
+      }
+    };
+
+    const onError = (e) => {
+      console.warn("Audio error:", e.target.error);
+      // Don't try to play if there's an audio error
+    };
+
     audio.addEventListener("loadedmetadata", onLoadedMetadata);
     audio.addEventListener("timeupdate", onTimeUpdate);
     audio.addEventListener("ended", onEnded);
+    audio.addEventListener("canplaythrough", onCanPlayThrough);
+    audio.addEventListener("error", onError);
 
-    if (isPlaying) audio.play().catch(() => {});
+    if (isPlaying && userHasInteracted) {
+      // Wait a bit longer before trying to play to ensure audio is ready
+      delayedPlay(audio, 100);
+    }
 
     return () => {
       audio.removeEventListener("loadedmetadata", onLoadedMetadata);
       audio.removeEventListener("timeupdate", onTimeUpdate);
       audio.removeEventListener("ended", onEnded);
+      audio.removeEventListener("canplaythrough", onCanPlayThrough);
+      audio.removeEventListener("error", onError);
     };
-  }, [currentTrack, isPlaying, repeatMode, handleNext]);
+  }, [currentTrack, isPlaying, repeatMode, handleNext, userHasInteracted, attemptPlay, delayedPlay]);
 
   useEffect(() => {
-    if (!audioRef.current) return;
-    if (isPlaying) audioRef.current.play().catch(() => {});
-    else audioRef.current.pause();
-  }, [isPlaying]);
+    const audio = audioRef.current;
+    if (!audio) return;
+    
+    if (isPlaying) {
+      if (userHasInteracted) {
+        // Add a small delay to ensure audio element is ready
+        delayedPlay(audio, 100);
+      } else {
+        console.log("User interaction required for audio playback on iOS");
+      }
+    } else {
+      // Safely pause without throwing errors
+      try {
+        audio.pause();
+      } catch (error) {
+        // Ignore pause errors in iOS development mode
+        console.log("Pause operation ignored:", error.message);
+      }
+    }
+  }, [isPlaying, userHasInteracted, attemptPlay, delayedPlay]);
+
+  // Add global event listeners to detect user interaction for iOS
+  useEffect(() => {
+    const handleUserInteraction = () => {
+      setUserHasInteracted(true);
+      // Remove listeners once user has interacted
+      document.removeEventListener('touchstart', handleUserInteraction);
+      document.removeEventListener('click', handleUserInteraction);
+    };
+
+    if (!userHasInteracted) {
+      document.addEventListener('touchstart', handleUserInteraction, { once: true });
+      document.addEventListener('click', handleUserInteraction, { once: true });
+    }
+
+    return () => {
+      document.removeEventListener('touchstart', handleUserInteraction);
+      document.removeEventListener('click', handleUserInteraction);
+    };
+  }, [userHasInteracted]);
+
+  // Cleanup timeouts on unmount
+  useEffect(() => {
+    return () => {
+      if (playTimeoutRef.current) {
+        clearTimeout(playTimeoutRef.current);
+      }
+    };
+  }, []);
 
   if (!currentTrack) return null;
 
@@ -399,7 +627,7 @@ const handlePrev = useCallback(() => {
             <IconButton onClick={toggleShuffle} sx={{ color: isShuffle ? "#1db954" : "rgba(255,255,255,0.7)" }}>
               <ShuffleIcon />
             </IconButton>
-            <IconButton onClick={handlePrev} sx={{ color: "#fff" }}>
+            <IconButton onClick={handlePrevWithInteraction} sx={{ color: "#fff" }}>
               <SkipPreviousIcon />
             </IconButton>
             <IconButton 
@@ -414,7 +642,7 @@ const handlePrev = useCallback(() => {
             >
               {isPlaying ? <PauseIcon /> : <PlayArrowIcon />}
             </IconButton>
-            <IconButton onClick={handleNext} sx={{ color: "#fff" }}>
+            <IconButton onClick={handleNextWithInteraction} sx={{ color: "#fff" }}>
               <SkipNextIcon />
             </IconButton>
             <IconButton onClick={toggleRepeat} sx={{ color: repeatMode !== "off" ? "#1db954" : "rgba(255,255,255,0.7)" }}>
@@ -456,7 +684,12 @@ const handlePrev = useCallback(() => {
           
         </Box>
         
-        <audio ref={audioRef} />
+        <audio 
+          ref={audioRef} 
+          preload="auto"
+          playsInline
+          crossOrigin="anonymous"
+        />
       </Box>
     );
   }
@@ -494,11 +727,13 @@ const handlePrev = useCallback(() => {
               }} 
               sx={{ 
                 color: currentTrack && likedTracks.includes(currentTrack.id) ? "#1db954" : "rgba(255,255,255,0.7)",
-                p: 0.5
+                padding: "3px",
+                minWidth: "26px",
+                minHeight: "26px"
               }}
               size="small"
             >
-              {currentTrack && likedTracks.includes(currentTrack.id) ? <FavoriteIcon fontSize="small" /> : <FavoriteBorderIcon fontSize="small" />}
+              {currentTrack && likedTracks.includes(currentTrack.id) ? <FavoriteIcon sx={{ fontSize: "1rem" }} /> : <FavoriteBorderIcon sx={{ fontSize: "1rem" }} />}
             </IconButton>
             
             
@@ -510,13 +745,13 @@ const handlePrev = useCallback(() => {
               sx={{ 
                 color: "#000", 
                 bgcolor: "#1db954",
-                width: 32,
-                height: 32,
+                width: 28,
+                height: 28,
                 ml: 0.5,
                 "&:hover": { bgcolor: "#1ed760" }
               }}
             >
-              {isPlaying ? <PauseIcon fontSize="small" /> : <PlayArrowIcon fontSize="small" />}
+              {isPlaying ? <PauseIcon sx={{ fontSize: "0.9rem" }} /> : <PlayArrowIcon sx={{ fontSize: "0.9rem" }} />}
             </IconButton>
           </Box>
         </Box>
@@ -574,18 +809,28 @@ const handlePrev = useCallback(() => {
             px: 2, 
             pt: 1 
           }}>
-            <IconButton onClick={() => setOpenMobile(false)} sx={{ color: "#fff", fontSize: "1.5rem" }}>
-              <CloseIcon fontSize="large" />
+            <IconButton 
+              onClick={() => setOpenMobile(false)} 
+              sx={{ 
+                color: "#fff", 
+                padding: "6px",
+                minWidth: "32px",
+                minHeight: "32px"
+              }}
+            >
+              <CloseIcon sx={{ fontSize: "1.2rem" }} />
             </IconButton>
             <Box /> {/* Spacer pour centrer */}
             <IconButton 
               onClick={() => currentTrack && handleLike(currentTrack.id)} 
               sx={{ 
                 color: currentTrack && likedTracks.includes(currentTrack.id) ? "#1db954" : "rgba(255,255,255,0.7)",
-                fontSize: "1.5rem"
+                padding: "6px",
+                minWidth: "32px",
+                minHeight: "32px"
               }}
             >
-              {currentTrack && likedTracks.includes(currentTrack.id) ? <FavoriteIcon fontSize="inherit" /> : <FavoriteBorderIcon fontSize="inherit" />}
+              {currentTrack && likedTracks.includes(currentTrack.id) ? <FavoriteIcon sx={{ fontSize: "1.2rem" }} /> : <FavoriteBorderIcon sx={{ fontSize: "1.2rem" }} />}
             </IconButton>
           </Box>
           
@@ -684,7 +929,7 @@ const handlePrev = useCallback(() => {
             display: "flex", 
             alignItems: "center", 
             justifyContent: "center", 
-            gap: { xs: 3, sm: 4 }, 
+            gap: { xs: 2, sm: 3 }, 
             width: "100%",
             flexShrink: 0,
             pt: 1, // Padding top au lieu de pb
@@ -695,21 +940,25 @@ const handlePrev = useCallback(() => {
               onClick={toggleShuffle} 
               sx={{ 
                 color: isShuffle ? "#1db954" : "rgba(255,255,255,0.7)", 
-                fontSize: { xs: "1.5rem", sm: "2rem" }
+                padding: "6px",
+                minWidth: "32px",
+                minHeight: "32px"
               }}
             >
-              <ShuffleIcon fontSize="inherit" />
+              <ShuffleIcon sx={{ fontSize: "1.1rem" }} />
             </IconButton>
 
             {/* Previous */}
             <IconButton 
-              onClick={handlePrev} 
+              onClick={handlePrevWithInteraction} 
               sx={{ 
                 color: "#fff", 
-                fontSize: { xs: "2rem", sm: "2.5rem" }
+                padding: "6px",
+                minWidth: "36px",
+                minHeight: "36px"
               }}
             >
-              <SkipPreviousIcon fontSize="inherit" />
+              <SkipPreviousIcon sx={{ fontSize: "1.5rem" }} />
             </IconButton>
 
             {/* Play/Pause - bouton principal */}
@@ -718,24 +967,25 @@ const handlePrev = useCallback(() => {
               sx={{ 
                 color: "#000", 
                 bgcolor: "#1db954",
-                fontSize: { xs: "2.5rem", sm: "3rem" },
-                width: { xs: 60, sm: 70 },
-                height: { xs: 60, sm: 70 },
+                width: { xs: 50, sm: 60 },
+                height: { xs: 50, sm: 60 },
                 "&:hover": { bgcolor: "#1ed760" }
               }}
             >
-              {isPlaying ? <PauseIcon fontSize="inherit" /> : <PlayArrowIcon fontSize="inherit" />}
+              {isPlaying ? <PauseIcon sx={{ fontSize: "1.8rem" }} /> : <PlayArrowIcon sx={{ fontSize: "1.8rem" }} />}
             </IconButton>
 
             {/* Next */}
             <IconButton 
-              onClick={handleNext} 
+              onClick={handleNextWithInteraction} 
               sx={{ 
                 color: "#fff", 
-                fontSize: { xs: "2rem", sm: "2.5rem" }
+                padding: "6px",
+                minWidth: "36px",
+                minHeight: "36px"
               }}
             >
-              <SkipNextIcon fontSize="inherit" />
+              <SkipNextIcon sx={{ fontSize: "1.5rem" }} />
             </IconButton>
 
             {/* Repeat */}
@@ -743,17 +993,24 @@ const handlePrev = useCallback(() => {
               onClick={toggleRepeat} 
               sx={{ 
                 color: repeatMode !== "off" ? "#1db954" : "rgba(255,255,255,0.7)", 
-                fontSize: { xs: "1.5rem", sm: "2rem" }
+                padding: "6px",
+                minWidth: "32px",
+                minHeight: "32px"
               }}
             >
-              {repeatMode === "one" ? <RepeatOneIcon fontSize="inherit" /> : <RepeatIcon fontSize="inherit" />}
+              {repeatMode === "one" ? <RepeatOneIcon sx={{ fontSize: "1.1rem" }} /> : <RepeatIcon sx={{ fontSize: "1.1rem" }} />}
             </IconButton>
           </Box>
         </Box>
       )}
 
 
-      <audio ref={audioRef} />
+      <audio 
+        ref={audioRef} 
+        preload="auto"
+        playsInline
+        crossOrigin="anonymous"
+      />
     </>
   );
 }

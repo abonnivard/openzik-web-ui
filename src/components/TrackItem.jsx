@@ -123,7 +123,16 @@ export default function TrackItem({
             e.stopPropagation();
             onDownload(track.name, track.album?.name, track.artists?.map((a) => a.name).join(", "));
           }}
-          sx={{ color: "#1db954" }}
+          sx={{ 
+            color: "#1db954",
+            padding: "4px",
+            minWidth: "28px",
+            minHeight: "28px",
+            "& .MuiSvgIcon-root": {
+              fontSize: "1rem"
+            }
+          }}
+          size="small"
         >
           <DownloadIcon />
         </IconButton>
@@ -131,7 +140,7 @@ export default function TrackItem({
 
       {/* Boutons classiques pour les albums */}
       {displayAlbum && (
-        <Box sx={{ display: "flex", alignItems: "center" }}>
+        <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
           {/* Bouton Like */}
           <IconButton
             onClick={(e) => {
@@ -143,11 +152,14 @@ export default function TrackItem({
               "&:hover": { 
                 color: likedTracks.includes(track.id) ? "#ff6b6b" : "#1db954",
                 bgcolor: likedTracks.includes(track.id) ? "rgba(255,107,107,0.1)" : "rgba(29,185,84,0.1)"
-              }
+              },
+              padding: "4px",
+              minWidth: "28px",
+              minHeight: "28px"
             }}
             size="small"
           >
-            {likedTracks.includes(track.id) ? <FavoriteIcon fontSize="small" /> : <FavoriteBorderIcon fontSize="small" />}
+            {likedTracks.includes(track.id) ? <FavoriteIcon sx={{ fontSize: "1rem" }} /> : <FavoriteBorderIcon sx={{ fontSize: "1rem" }} />}
           </IconButton>
           
           <PlaylistMenu
@@ -157,6 +169,7 @@ export default function TrackItem({
             onToggleLike={onToggleLike}
             isLiked={likedTracks.includes(track.id)}
             onCreatePlaylist={onCreatePlaylist}
+            compact={true}
           />
           <TrackMenu
             track={track}
@@ -164,6 +177,7 @@ export default function TrackItem({
             onAddToQueue={(track) => addToQueue(track, setToast)}
             showPlayOption={false} // Can already click on track
             setToast={setToast}
+            compact={true}
           />
         </Box>
       )}

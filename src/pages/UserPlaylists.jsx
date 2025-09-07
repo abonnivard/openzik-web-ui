@@ -591,12 +591,13 @@ export default function UserPlaylists({ setToast }) {
                 sx={{
                   color: pl.is_pinned ? "#1db954" : "rgba(255,255,255,0.4)",
                   "&:hover": { color: "#1db954" },
-                  width: isMobile ? 28 : 36,
-                  height: isMobile ? 28 : 36
+                  width: isMobile ? 24 : 32,
+                  height: isMobile ? 24 : 32,
+                  padding: isMobile ? "2px" : "4px"
                 }}
                 title={pl.is_pinned ? "Désépingler" : "Épingler"}
               >
-                {pl.is_pinned ? <PushPin fontSize={isMobile ? "small" : "medium"} /> : <PushPinOutlined fontSize={isMobile ? "small" : "medium"} />}
+                {pl.is_pinned ? <PushPin sx={{ fontSize: isMobile ? "0.9rem" : "1.1rem" }} /> : <PushPinOutlined sx={{ fontSize: isMobile ? "0.9rem" : "1.1rem" }} />}
               </IconButton>
             )}
             {!pl.isLikedPlaylist && (
@@ -608,12 +609,12 @@ export default function UserPlaylists({ setToast }) {
                 sx={{
                   color: "rgba(255,255,255,0.4)",
                   "&:hover": { color: "#1db954" },
-                  width: isMobile ? 28 : 36,
-                  height: 32,
-                  padding: '6px'
+                  width: isMobile ? 24 : 32,
+                  height: isMobile ? 24 : 32,
+                  padding: isMobile ? "2px" : "4px"
                 }}
               >
-                <DeleteIcon fontSize="small" />
+                <DeleteIcon sx={{ fontSize: isMobile ? "0.9rem" : "1rem" }} />
               </IconButton>
             )}
           </Box>
@@ -732,15 +733,20 @@ export default function UserPlaylists({ setToast }) {
                 </Box>
               </Box>
 
-              <Box sx={{ display: "flex", alignItems: "center" }}>
+              <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
                 <IconButton
                   onClick={() => handleLike(track)}
-                  sx={{ color: likedTracks.includes(track.id) ? "#1db954" : "#fff", width: 32, height: 32, padding: '6px' }}
+                  sx={{ 
+                    color: likedTracks.includes(track.id) ? "#1db954" : "#fff", 
+                    width: isMobile ? 24 : 28, 
+                    height: isMobile ? 24 : 28, 
+                    padding: isMobile ? "2px" : "4px" 
+                  }}
                 >
                   {likedTracks.includes(track.id) ? (
-                    <FavoriteIcon fontSize="small" />
+                    <FavoriteIcon sx={{ fontSize: isMobile ? "0.9rem" : "1rem" }} />
                   ) : (
-                    <FavoriteBorderIcon fontSize="small" />
+                    <FavoriteBorderIcon sx={{ fontSize: isMobile ? "0.9rem" : "1rem" }} />
                   )}
                 </IconButton>
 
@@ -749,6 +755,7 @@ export default function UserPlaylists({ setToast }) {
                   playlists={playlists.filter(p => p.id !== selectedPlaylist?.id)}
                   onAddToPlaylist={handleAddToPlaylist}
                   onCreatePlaylist={handleCreatePlaylist}
+                  compact={isMobile}
                 />
 
                 {!selectedPlaylist.isLikedPlaylist && (
@@ -757,17 +764,17 @@ export default function UserPlaylists({ setToast }) {
                     sx={{
                       color: "rgba(255,255,255,0.6)",
                       "&:hover": { color: "#ff4d4d" },
-                      width: 32,
-                      height: 32,
-                      padding: '6px'
+                      width: isMobile ? 24 : 28,
+                      height: isMobile ? 24 : 28,
+                      padding: isMobile ? "2px" : "4px"
                     }}
                   >
-                    <DeleteIcon fontSize="small" />
+                    <DeleteIcon sx={{ fontSize: isMobile ? "0.9rem" : "1rem" }} />
                   </IconButton>
                 )}
 
                 {/* Offline Download Button */}
-                <OfflineDownloadButton track={track} size={isMobile ? "small" : "medium"} />
+                <OfflineDownloadButton track={track} size={isMobile ? "small" : "medium"} compact={isMobile} />
 
                 <TrackMenu
                   track={track}
@@ -776,6 +783,7 @@ export default function UserPlaylists({ setToast }) {
                   onAddToQueue={(track) => addToQueue(track, setToast)}
                   showPlayOption={false} // Can already click on track
                   setToast={setToast}
+                  compact={isMobile}
                 />
               </Box>
             </Paper>

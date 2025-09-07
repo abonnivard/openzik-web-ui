@@ -3,10 +3,10 @@
 # Script simplifié pour générer les icônes iOS
 cd "/Users/adrien/Desktop/Music stack/music-web-frontend"
 
-SOURCE_IMAGE="src/assets/openzik-ios2.png"
+SOURCE_IMAGE="src/assets/openzik-ios.png"
 OUTPUT_DIR="ios/App/App/Assets.xcassets/AppIcon.appiconset"
 
-echo "🚀 Génération des icônes iOS depuis openzik-ios2.png..."
+echo "🚀 Génération des icônes iOS depuis openzik-ios.png..."
 
 # Vérifier que l'image source existe
 if [ ! -f "$SOURCE_IMAGE" ]; then

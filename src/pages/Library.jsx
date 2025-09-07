@@ -6,7 +6,9 @@ import {
   TextField,
   Paper,
   IconButton,
-  Alert
+  Alert,
+  useMediaQuery,
+  useTheme
 } from "@mui/material";
 import FavoriteIcon from "@mui/icons-material/Favorite";
 import FavoriteBorderIcon from "@mui/icons-material/FavoriteBorder";
@@ -105,6 +107,8 @@ export default function Library({ setToast }) {
 
   // Mode offline
   const { shouldUseOfflineMode } = useOfflineMode();
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
 
   // Charger bibliothèque
   useEffect(() => {
@@ -415,7 +419,7 @@ export default function Library({ setToast }) {
                   variant="rounded"
                   src={track.image || ""}
                   alt={track.title || "Track"}
-                  sx={{ width: 48, height: 48, flexShrink: 0 }}
+                  sx={{ width: isMobile ? 24 : 48, height: isMobile ? 24 : 48, flexShrink: 0 }}
                 />
                 <Box sx={{ overflow: "hidden", minWidth: 0, flex: 1 }}>
                   <Typography sx={{ 
@@ -423,13 +427,14 @@ export default function Library({ setToast }) {
                     fontWeight: 600,
                     whiteSpace: "nowrap",
                     overflow: "hidden",
-                    textOverflow: "ellipsis"
+                    textOverflow: "ellipsis",
+                    fontSize: isMobile ? "0.7rem" : "1rem"
                   }}>
                     {track.title || "Unknown Title"}
                   </Typography>
                   <Typography sx={{ 
                     color: "rgba(255,255,255,0.7)", 
-                    fontSize: "0.8rem",
+                    fontSize: isMobile ? "0.6rem" : "0.7rem",
                     whiteSpace: "nowrap",
                     overflow: "hidden",
                     textOverflow: "ellipsis"
@@ -440,8 +445,19 @@ export default function Library({ setToast }) {
               </Box>
 
               {/* Boutons like + playlist */}
-              <Box sx={{ display: "flex", alignItems: "center"}}>
-                <IconButton onClick={() => handleLike(track.id)} sx={{ color: likedTracks.includes(track.id) ? "#1db954" : "#fff" }}>
+              <Box sx={{ display: "flex", alignItems: "center", gap: isMobile ? 0.5 : 1}}>
+                <IconButton 
+                  onClick={() => handleLike(track.id)} 
+                  sx={{ 
+                    color: likedTracks.includes(track.id) ? "#1db954" : "#fff",
+                    padding: isMobile ? "2px" : "6px",
+                    minWidth: isMobile ? "24px" : "32px",
+                    minHeight: isMobile ? "24px" : "32px",
+                    "& .MuiSvgIcon-root": {
+                      fontSize: isMobile ? "0.9rem" : "1.1rem"
+                    }
+                  }}
+                >
                   {likedTracks.includes(track.id) ? <FavoriteIcon /> : <FavoriteBorderIcon />}
                 </IconButton>
                 <PlaylistMenu
@@ -451,15 +467,17 @@ export default function Library({ setToast }) {
                   onToggleLike={handleLike}
                   isLiked={likedTracks.includes(track.id)}
                   onCreatePlaylist={handleCreatePlaylist}
+                  compact={isMobile}
                 />
                 {/* Offline Download Button */}
-                <OfflineDownloadButton track={track} />
+                <OfflineDownloadButton track={track} compact={isMobile} />
                 <TrackMenu
                   track={track}
                   onPlay={playTrack}
                   onAddToQueue={(track) => addToQueue(track, setToast)}
                   showPlayOption={false} // Can already click on track
                   setToast={setToast}
+                  compact={isMobile}
                 />
               </Box>
             </Paper>

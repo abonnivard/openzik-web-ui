@@ -15,7 +15,7 @@ import {
 import { hasOfflineSupport } from '../utils/platform';
 import offlineDownloadService from '../services/offlineDownload';
 
-const OfflineDownloadButton = ({ track, size = 'medium' }) => {
+const OfflineDownloadButton = ({ track, size = 'medium', compact = false }) => {
   const [isDownloading, setIsDownloading] = useState(false);
   const [isOffline, setIsOffline] = useState(false);
   const [downloadProgress, setDownloadProgress] = useState(0);
@@ -90,7 +90,8 @@ const OfflineDownloadButton = ({ track, size = 'medium' }) => {
     return null;
   }
 
-  const buttonSize = size === 'small' ? 'small' : 'medium';
+  const buttonSize = compact ? 'small' : (size === 'small' ? 'small' : 'medium');
+  const iconSize = compact ? 'small' : (size === 'small' ? 'small' : 'medium');
 
   return (
     <>
@@ -99,7 +100,7 @@ const OfflineDownloadButton = ({ track, size = 'medium' }) => {
           <Tooltip title={`Downloading... ${Math.round(downloadProgress)}%`}>
             <Box position="relative" display="inline-flex">
               <CircularProgress 
-                size={size === 'small' ? 24 : 32}
+                size={compact ? 20 : (size === 'small' ? 24 : 32)}
                 variant="determinate" 
                 value={downloadProgress}
                 sx={{
@@ -120,8 +121,8 @@ const OfflineDownloadButton = ({ track, size = 'medium' }) => {
                 justifyContent="center"
               >
                 <DownloadIcon 
-                  fontSize={size === 'small' ? 'inherit' : 'small'} 
-                  sx={{ color: '#1db954', fontSize: size === 'small' ? '12px' : '16px' }}
+                  fontSize={compact ? 'inherit' : (size === 'small' ? 'inherit' : 'small')} 
+                  sx={{ color: '#1db954', fontSize: compact ? '10px' : (size === 'small' ? '12px' : '16px') }}
                 />
               </Box>
             </Box>
@@ -138,10 +139,16 @@ const OfflineDownloadButton = ({ track, size = 'medium' }) => {
                   bgcolor: 'rgba(255,107,107,0.08)',
                   transform: 'scale(1.1)'
                 },
-                transition: 'all 0.2s ease'
+                transition: 'all 0.2s ease',
+                padding: compact ? "2px" : "6px",
+                minWidth: compact ? "24px" : "32px",
+                minHeight: compact ? "24px" : "32px",
+                "& .MuiSvgIcon-root": {
+                  fontSize: compact ? "0.9rem" : "1.1rem"
+                }
               }}
             >
-              <CheckCircleIcon fontSize={size === 'small' ? 'small' : 'medium'} />
+              <CheckCircleIcon fontSize={iconSize} />
             </IconButton>
           </Tooltip>
         ) : (
@@ -156,10 +163,16 @@ const OfflineDownloadButton = ({ track, size = 'medium' }) => {
                   bgcolor: 'rgba(29,185,84,0.08)',
                   transform: 'scale(1.1)'
                 },
-                transition: 'all 0.2s ease'
+                transition: 'all 0.2s ease',
+                padding: compact ? "2px" : "6px",
+                minWidth: compact ? "24px" : "32px",
+                minHeight: compact ? "24px" : "32px",
+                "& .MuiSvgIcon-root": {
+                  fontSize: compact ? "0.9rem" : "1.1rem"
+                }
               }}
             >
-              <DownloadIcon fontSize={size === 'small' ? 'small' : 'medium'} />
+              <DownloadIcon fontSize={iconSize} />
             </IconButton>
           </Tooltip>
         )}

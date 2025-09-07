@@ -122,7 +122,7 @@ const DownloadedMusic = ({ setToast }) => {
       <Paper sx={{ p: 2, mb: 3, bgcolor: 'rgba(255,255,255,0.05)' }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 1 }}>
           <Storage sx={{ color: '#1db954' }} />
-          <Typography variant="h6">Storage Info</Typography>
+          <Typography variant="h6" color="#fff">Storage Info</Typography>
         </Box>
         <Typography variant="body2" color="rgba(255,255,255,0.7)">
           {downloadedTracks.length} tracks • {formatFileSize(totalSize)}

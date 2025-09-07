@@ -13,7 +13,8 @@ export default function PlaylistMenu({
   onAddToPlaylist, 
   onToggleLike, 
   isLiked = false,
-  onCreatePlaylist
+  onCreatePlaylist,
+  compact = false
 }) {
   const [anchorEl, setAnchorEl] = useState(null);
   const open = Boolean(anchorEl);
@@ -38,9 +39,15 @@ export default function PlaylistMenu({
         onClick={handleClick}
         sx={{ 
           color: "rgba(255,255,255,0.7)",
-          "&:hover": { color: "#fff" }
+          "&:hover": { color: "#fff" },
+          padding: compact ? "2px" : "6px",
+          minWidth: compact ? "28px" : "36px",
+          minHeight: compact ? "28px" : "36px",
+          "& .MuiSvgIcon-root": {
+            fontSize: compact ? "0.9rem" : "1.1rem"
+          }
         }}
-        size="small"
+        size={compact ? "small" : "medium"}
       >
         <PlaylistAddIcon />
       </IconButton>

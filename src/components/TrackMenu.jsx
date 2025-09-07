@@ -15,7 +15,8 @@ export default function TrackMenu({
   onPlay, 
   onAddToQueue, 
   showPlayOption = true,
-  setToast
+  setToast,
+  compact = false
 }) {
   const [anchorEl, setAnchorEl] = useState(null);
   const open = Boolean(anchorEl);
@@ -40,9 +41,15 @@ export default function TrackMenu({
         onClick={handleClick}
         sx={{ 
           color: "rgba(255,255,255,0.7)",
-          "&:hover": { color: "#fff" }
+          "&:hover": { color: "#fff" },
+          padding: compact ? "2px" : "6px",
+          minWidth: compact ? "28px" : "36px",
+          minHeight: compact ? "28px" : "36px",
+          "& .MuiSvgIcon-root": {
+            fontSize: compact ? "0.9rem" : "1.1rem"
+          }
         }}
-        size="small"
+        size={compact ? "small" : "medium"}
       >
         <MoreVertIcon />
       </IconButton>
